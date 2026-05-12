@@ -6,7 +6,6 @@
 <meta name="theme-color" content="#c084fc">
 <title>Pilates Control</title>
 <style>
-  
   :root {
     --primary: #a855f7;
     --primary-dark: #7e22ce;
@@ -284,7 +283,8 @@
       <option value="wellhub">Somente Wellhub</option>
       <option value="regular">Somente Regular (sem convênio)</option>
     </select>
-    <button class="btn btn-primary" onclick="exportarPDF()" style="margin-top:4px">📄 Exportar PDF</button>
+    <button class="btn btn-primary" onclick="exportarPDF()" style="margin-top:4px">📄 Exportar PDF (Aulas)</button>
+    <button class="btn btn-ghost" onclick="exportarGradePDF()" style="margin-top:8px">🗓️ Exportar Grade Horária</button>
   </div>
   <div id="relResult"></div>
 </div>
@@ -1253,6 +1253,108 @@
     win.document.close();
     toast('📄 Abrindo relatório para impressão...');
   }
+
+  // ─── EXPORTAR GRADE HORÁRIA (tabela estilo folha) ─────────────────────────
+  function exportarGradePDF() {
+    const studio = db.config.studio || 'Pilates Control';
+    const prof   = db.config.nome   || '';
+    const today  = new Date().toLocaleDateString('pt-BR');
+
+    const HORARIOS = [
+      '07:00','08:00','09:00','10:00','11:00',
+      '13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'
+    ];
+    const DIAS_LABEL = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+    const DIAS_NUM   = [1,2,3,4,5,6];
+
+    // Build lookup: dia -> hora -> [nomes]
+    const lookup = {};
+    DIAS_NUM.forEach(d => {
+      lookup[d] = {};
+      HORARIOS.forEach(h => { lookup[d][h] = []; });
+    });
+
+    db.grade.forEach(slot => {
+      const h = slot.hora.slice(0,5); // normalize to HH:MM
+      if (!lookup[slot.dia]) return;
+      if (!lookup[slot.dia][h]) lookup[slot.dia][h] = [];
+      (slot.alunaIds||[]).forEach(aid => {
+        const al = db.alunas.find(a=>a.id===aid);
+        if (al) lookup[slot.dia][h].push(al.nome);
+      });
+    });
+
+    // Only include rows that have at least one aluna in any day
+    const activeHorarios = HORARIOS.filter(h =>
+      DIAS_NUM.some(d => lookup[d][h] && lookup[d][h].length > 0)
+    );
+
+    if (!activeHorarios.length) {
+      toast('⚠️ Nenhum horário cadastrado na grade'); return;
+    }
+
+    const headerCells = DIAS_LABEL.map(d =>
+      `<th>${d}</th>`
+    ).join('');
+
+    const rows = activeHorarios.map(h => {
+      const cells = DIAS_NUM.map(d => {
+        const nomes = lookup[d][h];
+        if (!nomes || !nomes.length) return `<td class="empty-cell"></td>`;
+        return `<td>${nomes.map(n => `<span class="aluna-nome">${n}</span>`).join('')}</td>`;
+      }).join('');
+      const endH = String(parseInt(h)+1).padStart(2,'0');
+      return `<tr><td class="hora-cell">${h} – ${endH}:50</td>${cells}</tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <title>Grade Horária – ${studio}</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+      * { box-sizing:border-box; margin:0; padding:0; }
+      body { font-family:'Inter',sans-serif; color:#1e1b2e; padding:20px; background:#fff; }
+      .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:18px; border-bottom:3px solid #a855f7; padding-bottom:12px; }
+      .studio  { font-size:20px; font-weight:800; color:#7e22ce; }
+      .sub     { font-size:12px; color:#6b7280; margin-top:3px; }
+      .meta    { font-size:11px; color:#9ca3af; text-align:right; line-height:1.8; }
+      table    { width:100%; border-collapse:collapse; font-size:11.5px; table-layout:fixed; }
+      th       { background:#7e22ce; color:#fff; padding:8px 6px; text-align:center; font-weight:700; font-size:12px; }
+      th:first-child { width:90px; background:#5b21b6; }
+      td       { border:1px solid #e9d5ff; padding:6px 7px; vertical-align:top; min-height:36px; }
+      td.hora-cell { background:#f3e8ff; font-weight:700; font-size:11px; color:#6b21a8; text-align:center; vertical-align:middle; white-space:nowrap; }
+      td.empty-cell { background:#fafafa; }
+      tr:hover td { background:#fdf4ff; }
+      tr:hover td.hora-cell { background:#ede9fe; }
+      .aluna-nome { display:block; padding:2px 0; font-size:11px; color:#1e1b2e; line-height:1.4; }
+      .aluna-nome:not(:last-child) { border-bottom:1px dotted #e9d5ff; margin-bottom:2px; padding-bottom:2px; }
+      .footer { margin-top:14px; text-align:center; font-size:10px; color:#d1d5db; }
+      @media print {
+        body { padding:10px; }
+        @page { size: landscape; margin: 10mm; }
+      }
+    </style></head><body>
+    <div class="header">
+      <div>
+        <div class="studio">🧘 ${studio}</div>
+        ${prof ? `<div class="sub">Professora: ${prof}</div>` : ''}
+      </div>
+      <div class="meta">Grade Horária<br>Gerado em ${today}</div>
+    </div>
+    <table>
+      <thead><tr><th>Horário</th>${headerCells}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">Pilates Control v2.0 · Grade gerada automaticamente</div>
+    <script>window.onload=()=>{ window.print(); }<\/script>
+    </body></html>`;
+
+    const win = window.open('','_blank');
+    if (!win) { toast('⚠️ Permita pop-ups para exportar'); return; }
+    win.document.write(html);
+    win.document.close();
+    toast('🗓️ Abrindo grade para impressão...');
+  }
+
 
   // ─── HELPERS ──────────────────────────────────────────────────────────────
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
