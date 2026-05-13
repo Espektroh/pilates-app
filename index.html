@@ -250,6 +250,9 @@
     <div class="card-title" style="margin-bottom:14px">👩 Sobre Mim</div>
     <label>Seu Nome</label><input type="text" id="cfgNome" placeholder="Nome da professora" oninput="salvarConfig()">
     <label>Studio</label><input type="text" id="cfgStudio" placeholder="Nome do studio" oninput="salvarConfig()">
+    <label>Estúdios Adicionais (um por linha)</label>
+    <textarea id="cfgStudios" placeholder="Ex: Studio Centro&#10;Studio Jardins" rows="3" oninput="salvarConfig()"></textarea>
+    <div class="info-box-blue" style="margin-top:-8px">ℹ️ Se você trabalha em mais de um estúdio, adicione os nomes acima. Eles aparecerão como filtro no Relatório.</div>
   </div>
   <div class="card">
     <div class="card-title" style="margin-bottom:14px">💾 Backup de Dados</div>
@@ -276,6 +279,10 @@
     </div>
     <label>Aluna (opcional)</label>
     <select id="relAluna" onchange="renderRelatorio()"><option value="">Todas</option></select>
+    <label>Filtrar por Horário</label>
+    <select id="relHorario" onchange="renderRelatorio()"><option value="">Todos os Horários</option></select>
+    <label>Filtrar por Estúdio</label>
+    <select id="relStudio" onchange="renderRelatorio()"><option value="">Todos os Estúdios</option></select>
     <label>Filtrar por Plano</label>
     <select id="relPlano" onchange="renderRelatorio()">
       <option value="">Todos</option>
@@ -365,6 +372,8 @@
         <select id="gTipo"><option>Individual</option><option>Dupla</option><option>Trio</option><option>Grupo</option></select>
       </div>
     </div>
+    <label>Estúdio</label>
+    <select id="gStudio"><option value="">— Sem estúdio específico —</option></select>
     <label>Aluna(s) neste horário</label>
     <div id="gAlunasSel" style="max-height:200px;overflow-y:auto;border:1.5px solid var(--border);border-radius:10px;padding:8px;margin-bottom:12px;background:var(--bg)"></div>
     <div class="modal-actions">
@@ -399,6 +408,30 @@
   </div>
 </div>
 
+<!-- MODAL APARELHOS (após marcar presença) -->
+<div class="modal-overlay" id="modalAparelho">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🏋️ Qual aparelho foi usado?</div>
+    <div id="aparelhoAlunaInfo" style="font-size:.9rem;color:var(--text-muted);margin-bottom:16px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <button class="btn btn-ghost" id="apReformer"   onclick="selecionarAparelho('Reformer')"   style="flex-direction:column;gap:4px;padding:16px 10px">
+        <span style="font-size:1.5rem">🛏️</span><span style="font-size:.82rem;font-weight:700">Reformer</span>
+      </button>
+      <button class="btn btn-ghost" id="apCadillac"   onclick="selecionarAparelho('Cadillac')"   style="flex-direction:column;gap:4px;padding:16px 10px">
+        <span style="font-size:1.5rem">🔧</span><span style="font-size:.82rem;font-weight:700">Cadillac<br><span style="font-size:.72rem;font-weight:400">(Trapézio)</span></span>
+      </button>
+      <button class="btn btn-ghost" id="apChair"      onclick="selecionarAparelho('Chair')"      style="flex-direction:column;gap:4px;padding:16px 10px">
+        <span style="font-size:1.5rem">🪑</span><span style="font-size:.82rem;font-weight:700">Chair<br><span style="font-size:.72rem;font-weight:400">(Wunda Chair)</span></span>
+      </button>
+      <button class="btn btn-ghost" id="apLadder"     onclick="selecionarAparelho('Ladder Barrel')" style="flex-direction:column;gap:4px;padding:16px 10px">
+        <span style="font-size:1.5rem">🪜</span><span style="font-size:.82rem;font-weight:700">Ladder Barrel</span>
+      </button>
+    </div>
+    <button class="btn btn-ghost" onclick="selecionarAparelho('')" style="font-size:.82rem;color:var(--text-muted)">Pular — registrar sem aparelho</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -419,6 +452,7 @@
 
   let editId = null;
   let faltaCtx = null;
+  let aparelhoCtx = null;
   let gradeEditId = null;
   let reposChoice = 'nao';
   let activeDayTab = 1;
@@ -449,6 +483,7 @@
     document.getElementById('currentMonth').textContent = now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
     if (db.config.nome)   document.getElementById('cfgNome').value   = db.config.nome;
     if (db.config.studio) { document.getElementById('cfgStudio').value = db.config.studio; document.getElementById('navStudio').textContent = db.config.studio; }
+    if (db.config.studios && db.config.studios.length) document.getElementById('cfgStudios').value = db.config.studios.join('\n');
     // Set active day tab to today's weekday
     const todayDow = dowFromDate(now.toISOString().slice(0,10));
     if (todayDow >= 1 && todayDow <= 6) activeDayTab = todayDow;
@@ -576,7 +611,7 @@
       }).join('');
       return `<div class="slot-card">
         <div class="slot-time">
-          <span>⏰ ${slot.hora} · ${slot.tipo}</span>
+          <span>⏰ ${slot.hora} · ${slot.tipo}${slot.studio?` · <span style="font-size:.75rem;color:#9ca3af">🏢 ${slot.studio}</span>`:''}</span>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-sm" onclick="editGradeSlot('${slot.id}')">✏️</button>
             <button class="btn btn-danger btn-sm" onclick="excluirGrade('${slot.id}')">🗑️</button>
@@ -593,6 +628,12 @@
 
   function openModalGrade(id) {
     gradeEditId = id || null;
+    // Populate studio dropdown
+    const studioSel = document.getElementById('gStudio');
+    const allStudios = [db.config.studio, ...(db.config.studios||[])].filter(Boolean);
+    studioSel.innerHTML = '<option value="">— Sem estúdio específico —</option>' +
+      allStudios.map(s=>`<option value="${s}">${s}</option>`).join('');
+
     // Build aluna checkboxes
     const checksEl = document.getElementById('gAlunasSel');
     checksEl.innerHTML = db.alunas.length
@@ -607,12 +648,14 @@
       document.getElementById('gDia').value  = s.dia;
       document.getElementById('gHora').value = s.hora;
       document.getElementById('gTipo').value = s.tipo;
+      document.getElementById('gStudio').value = s.studio || '';
       (s.alunaIds||[]).forEach(aid => { const el = document.getElementById('gal_'+aid); if(el) el.checked=true; });
       document.getElementById('modalGradeTitle').textContent = '✏️ Editar Horário';
     } else {
       document.getElementById('gDia').value  = activeDayTab;
       document.getElementById('gHora').value = '07:00';
       document.getElementById('gTipo').value = 'Individual';
+      document.getElementById('gStudio').value = '';
       document.getElementById('modalGradeTitle').textContent = '➕ Novo Horário';
     }
     document.getElementById('modalGrade').classList.add('open');
@@ -624,13 +667,14 @@
     const dia      = +document.getElementById('gDia').value;
     const hora     = document.getElementById('gHora').value;
     const tipo     = document.getElementById('gTipo').value;
+    const studio   = document.getElementById('gStudio').value;
     const alunaIds = [...document.querySelectorAll('#gAlunasSel input[type=checkbox]:checked')].map(c=>c.value);
     if (!hora) { toast('⚠️ Informe o horário'); return; }
     if (gradeEditId) {
-      Object.assign(db.grade.find(g=>g.id===gradeEditId), { dia, hora, tipo, alunaIds });
+      Object.assign(db.grade.find(g=>g.id===gradeEditId), { dia, hora, tipo, studio, alunaIds });
       toast('✅ Horário atualizado!');
     } else {
-      db.grade.push({ id:uid(), dia, hora, tipo, alunaIds });
+      db.grade.push({ id:uid(), dia, hora, tipo, studio, alunaIds });
       toast('✅ Horário cadastrado!');
     }
     save(); renderGrade(); closeModal('modalGrade');
@@ -672,7 +716,8 @@
 
         let statusLine = '';
         if (status === 'presente') {
-          statusLine = '<div style="font-size:.78rem;color:var(--success);font-weight:700;margin-top:4px">✅ Presente</div>';
+          const apLabel = prec.aparelho ? `<span style="font-size:.74rem;background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:10px;font-weight:700;margin-left:4px">🏋️ ${prec.aparelho}</span>` : '';
+          statusLine = `<div style="font-size:.78rem;color:var(--success);font-weight:700;margin-top:4px">✅ Presente${apLabel}</div>`;
         } else if (status === 'falta') {
           const repos = prec.reposicao === 'sim' ? ' · 🔄 Com reposição' : ' · Sem reposição';
           statusLine  = `<div style="font-size:.78rem;color:var(--danger);font-weight:700;margin-top:4px">❌ Falta${repos}</div>`;
@@ -749,8 +794,8 @@
         card.classList.add('snap-back');
         card.style.transform = '';
         if (currentX > THRESHOLD) {
-          // Swipe right → presente
-          marcarPresenca(slotId, alunaId, dateStr, 'presente', tipo);
+          // Swipe right → abrir modal de aparelho
+          abrirModalAparelho(slotId, alunaId, dateStr, tipo);
         } else if (currentX < -THRESHOLD) {
           // Swipe left → falta modal
           abrirModalFalta(slotId, alunaId, dateStr, tipo);
@@ -769,12 +814,33 @@
     });
   }
 
-  function marcarPresenca(slotId, alunaId, data, status, tipo) {
+  function marcarPresenca(slotId, alunaId, data, status, tipo, aparelho) {
     const idx = db.presencas.findIndex(p=>p.slotId===slotId&&p.alunaId===alunaId&&p.data===data);
-    const rec = { id: idx>=0 ? db.presencas[idx].id : uid(), slotId, alunaId, data, status, tipo };
+    const rec = { id: idx>=0 ? db.presencas[idx].id : uid(), slotId, alunaId, data, status, tipo, aparelho: aparelho||'' };
     if (idx >= 0) db.presencas[idx] = rec;
     else db.presencas.push(rec);
     save(); renderPresenca(); renderStats(); renderUltimas(); toast('✅ Presença registrada!');
+  }
+
+  // ─── MODAL APARELHOS ──────────────────────────────────────────────────────
+  function abrirModalAparelho(slotId, alunaId, data, tipo) {
+    const al = db.alunas.find(a=>a.id===alunaId);
+    aparelhoCtx = { slotId, alunaId, data, tipo };
+    document.getElementById('aparelhoAlunaInfo').textContent = `${al?al.nome:'—'} · ${fmt(data)}`;
+    // Reset button styles
+    ['apReformer','apCadillac','apChair','apLadder'].forEach(id=>{
+      document.getElementById(id).classList.remove('btn-primary');
+      document.getElementById(id).classList.add('btn-ghost');
+    });
+    document.getElementById('modalAparelho').classList.add('open');
+  }
+
+  function selecionarAparelho(aparelho) {
+    if (!aparelhoCtx) return;
+    const { slotId, alunaId, data, tipo } = aparelhoCtx;
+    marcarPresenca(slotId, alunaId, data, 'presente', tipo, aparelho);
+    closeModal('modalAparelho');
+    aparelhoCtx = null;
   }
 
   // ─── MODAL FALTA ──────────────────────────────────────────────────────────
@@ -933,6 +999,7 @@
             </div>
           </div>
           ${p.status==='falta'&&p.motivo?`<div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">📝 ${p.motivo}</div>`:''}
+          ${p.status==='presente'&&p.aparelho?`<div style="font-size:.75rem;color:var(--primary);margin-top:3px">🏋️ ${p.aparelho}</div>`:''}
           ${p.reposData?`<div style="font-size:.75rem;color:#92400e;margin-top:2px">🔄 Reposição: ${fmt(p.reposData)}</div>`:''}
         </div>`;
       }).join('')}` : ''}
@@ -1046,13 +1113,34 @@
     const de  = document.getElementById('relDe')?.value;
     const ate = document.getElementById('relAte')?.value;
     if (!de||!ate) return;
-    const filtAluna = document.getElementById('relAluna')?.value || '';
-    const filtPlano = document.getElementById('relPlano')?.value || '';
+    const filtAluna   = document.getElementById('relAluna')?.value   || '';
+    const filtPlano   = document.getElementById('relPlano')?.value   || '';
+    const filtHorario = document.getElementById('relHorario')?.value || '';
+    const filtStudio  = document.getElementById('relStudio')?.value  || '';
 
-    // Rebuild select
+    // Rebuild aluna select
     const sel = document.getElementById('relAluna');
     const cur = sel.value;
     sel.innerHTML = '<option value="">Todas</option>' + db.alunas.map(a=>`<option value="${a.id}"${a.id===cur?' selected':''}>${a.nome}</option>`).join('');
+
+    // Rebuild horário select (distinct slot times from grade)
+    const horSel = document.getElementById('relHorario');
+    const curHor = horSel.value;
+    const uniqueSlots = [...new Map(db.grade.map(s=>[s.hora + (s.studio?'|'+s.studio:''), s])).values()]
+      .sort((a,b)=>a.hora.localeCompare(b.hora));
+    horSel.innerHTML = '<option value="">Todos os Horários</option>' +
+      uniqueSlots.map(s=>{
+        const label = s.hora + (s.studio ? ` · ${s.studio}` : '');
+        const val   = s.id;
+        return `<option value="${val}"${val===curHor?' selected':''}>${label}</option>`;
+      }).join('');
+
+    // Rebuild studio select
+    const studioSel = document.getElementById('relStudio');
+    const curStudio = studioSel.value;
+    const allStudios = [...new Set(db.grade.map(s=>s.studio).filter(Boolean))];
+    studioSel.innerHTML = '<option value="">Todos os Estúdios</option>' +
+      allStudios.map(s=>`<option value="${s}"${s===curStudio?' selected':''}>${s}</option>`).join('');
 
     const allP = getAllPresentes();
     let auls = allP.filter(a=>a.data>=de&&a.data<=ate);
@@ -1064,6 +1152,26 @@
         return conv === filtPlano;
       });
     }
+    if (filtHorario) {
+      // Filter by slotId (from presencas) or matching hora (from old aulas)
+      const slot = db.grade.find(s=>s.id===filtHorario);
+      if (slot) {
+        auls = auls.filter(a => {
+          if (a.source === 'presenca') return a.slotId === filtHorario;
+          // For old aulas: we can't filter by slot, so exclude them when a slot filter is active
+          return false;
+        });
+      }
+    }
+    if (filtStudio) {
+      // Filter presencas whose slot belongs to the selected studio
+      const slotIds = db.grade.filter(s=>s.studio===filtStudio).map(s=>s.id);
+      auls = auls.filter(a => {
+        if (a.source === 'presenca') return slotIds.includes(a.slotId);
+        return false; // old aulas have no studio info
+      });
+    }
+
     auls.sort((a,b)=>b.data.localeCompare(a.data)||a.alunaId.localeCompare(b.alunaId));
 
     const byDate = {};
@@ -1083,13 +1191,20 @@
           const conv = al?.convenio;
           const badge = conv==='totalpass'?'<span class="plan-badge plan-totalpass">TotalPass</span>'
                       : conv==='wellhub'?'<span class="plan-badge plan-wellhub">Wellhub</span>':'';
+          // Get slot info for studio display
+          const slot = a.slotId ? db.grade.find(s=>s.id===a.slotId) : null;
+          const studioLine = slot?.studio ? `<div style="font-size:.75rem;color:var(--primary);margin-top:3px">🏢 ${slot.studio} · ⏰ ${slot.hora}</div>` :
+                             slot?.hora   ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">⏰ ${slot.hora}</div>` : '';
+          // Aparelho from presenca
+          const aparelho = a.aparelho || '';
           return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:700;font-size:.95rem">👩 ${al?al.nome:'—'}${badge}</span>
               <span class="log-type">${a.tipo}</span>
             </div>
-            ${a.aparelhos?`<div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">🏋️ ${a.aparelhos}</div>`:
-              `<div style="font-size:.78rem;color:#c4b5d4;margin-top:4px;font-style:italic">Sem aparelhos registrados</div>`}
+            ${studioLine}
+            ${aparelho?`<div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">🏋️ ${aparelho}</div>`:
+              `<div style="font-size:.78rem;color:#c4b5d4;margin-top:4px;font-style:italic">Sem aparelho registrado</div>`}
           </div>`;
         }).join('')}
       </div>`).join('');
@@ -1107,6 +1222,8 @@
   function salvarConfig() {
     db.config.nome   = document.getElementById('cfgNome').value;
     db.config.studio = document.getElementById('cfgStudio').value;
+    db.config.studios = document.getElementById('cfgStudios').value
+      .split('\n').map(s=>s.trim()).filter(Boolean);
     document.getElementById('navStudio').textContent = db.config.studio;
     save();
   }
