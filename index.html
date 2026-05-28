@@ -106,18 +106,12 @@
   .slot-students { display: flex; flex-direction: column; gap: 6px; }
   .slot-student { display: flex; align-items: center; justify-content: space-between; background: var(--bg); border-radius: 10px; padding: 8px 12px; }
   .slot-student-name { font-size: .88rem; font-weight: 600; }
-  .attendance-btns { display: flex; gap: 6px; }
   .att-btn { padding: 5px 10px; border-radius: 8px; border: none; cursor: pointer; font-size: .75rem; font-weight: 700; transition: all .15s; }
   .att-btn.presente { background: #d1fae5; color: #065f46; }
   .att-btn.falta { background: #fee2e2; color: #991b1b; }
   .att-btn.active-presente { background: var(--success); color: #fff; }
   .att-btn.active-falta { background: var(--danger); color: #fff; }
   .slot-empty { font-size: .82rem; color: var(--text-muted); font-style: italic; padding: 4px 0; }
-
-  /* ---- ATTENDANCE STATUS ICONS ---- */
-  .status-presente::before { content: '✅ '; }
-  .status-falta::before { content: '❌ '; }
-  .status-falta-repos::before { content: '🔄 '; }
 
   /* ---- TOGGLE ---- */
   .toggle-row { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -128,7 +122,7 @@
   /* ---- SECTION SEPARATOR ---- */
   .section-label { font-size: .72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin: 16px 0 8px; }
 
-  /* ---- PLAN BADGES in payment ---- */
+  /* ---- PLAN BADGES ---- */
   .plan-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: .7rem; font-weight: 700; margin-left: 6px; }
   .plan-totalpass { background: #dbeafe; color: #1e40af; }
   .plan-wellhub { background: #dcfce7; color: #14532d; }
@@ -150,6 +144,33 @@
 
   .divider { height: 1px; background: var(--border); margin: 12px 0; }
   .hidden { display: none !important; }
+
+  /* ---- STUDIOS LIST ---- */
+  .studio-item {
+    background: var(--surface); border-radius: 14px; padding: 14px 16px;
+    margin-bottom: 10px; border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .studio-item:hover { border-color: var(--primary); }
+  .studio-color-dot {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; margin-right: 10px;
+  }
+  .studio-info { flex: 1; }
+  .studio-name { font-weight: 700; font-size: .95rem; }
+  .studio-meta { font-size: .75rem; color: var(--text-muted); margin-top: 2px; }
+  .studio-actions { display: flex; gap: 6px; }
+
+  /* ---- GRADE STUDIO FILTER ---- */
+  .studio-filter-bar { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; }
+  .sf-btn { flex-shrink: 0; padding: 7px 14px; border-radius: 20px; font-size: .78rem; font-weight: 700; border: 1.5px solid var(--border); background: var(--surface); cursor: pointer; color: var(--text-muted); transition: all .2s; white-space: nowrap; }
+  .sf-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  /* ---- STUDIO BADGE in slot ---- */
+  .studio-badge-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 12px; font-size: .68rem; font-weight: 700;
+    background: var(--primary-light); color: var(--primary);
+  }
 </style>
 </head>
 <body>
@@ -193,10 +214,12 @@
 <!-- GRADE HORÁRIA -->
 <div id="page-grade" class="page">
   <div class="card" style="padding:14px 16px;margin-bottom:10px">
-    <div style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="card-title">🗓️ Grade de Horários</div>
       <button class="btn btn-ghost btn-sm" onclick="openModalGrade()">+ Horário</button>
     </div>
+    <!-- Studio filter bar -->
+    <div class="studio-filter-bar" id="gradeStudioFilter"></div>
   </div>
   <div class="schedule-day-tabs" id="dayTabs"></div>
   <div id="gradeSlots"></div>
@@ -210,6 +233,10 @@
     </div>
     <label>Data</label>
     <input type="date" id="presencaData" onchange="renderPresenca()">
+    <label>Filtrar por Estúdio</label>
+    <select id="presencaStudioFilter" onchange="renderPresenca()">
+      <option value="">Todos os Estúdios</option>
+    </select>
   </div>
   <div id="presencaSlots"></div>
 </div>
@@ -231,6 +258,10 @@
       <div><label>De</label><input type="date" id="payDe" onchange="renderPagamento()"></div>
       <div><label>Até</label><input type="date" id="payAte" onchange="renderPagamento()"></div>
     </div>
+    <label>Filtrar por Estúdio</label>
+    <select id="payStudioFilter" onchange="renderPagamento()">
+      <option value="">Todos os Estúdios</option>
+    </select>
     <div class="form-row">
       <div><label>Valor Individual (R$)</label><input type="number" id="vIndividual" value="80" onchange="renderPagamento()"></div>
       <div><label>Valor Dupla (R$)</label><input type="number" id="vDupla" value="50" onchange="renderPagamento()"></div>
@@ -249,11 +280,18 @@
   <div class="card">
     <div class="card-title" style="margin-bottom:14px">👩 Sobre Mim</div>
     <label>Seu Nome</label><input type="text" id="cfgNome" placeholder="Nome da professora" oninput="salvarConfig()">
-    <label>Studio</label><input type="text" id="cfgStudio" placeholder="Nome do studio" oninput="salvarConfig()">
-    <label>Estúdios Adicionais (um por linha)</label>
-    <textarea id="cfgStudios" placeholder="Ex: Studio Centro&#10;Studio Jardins" rows="3" oninput="salvarConfig()"></textarea>
-    <div class="info-box-blue" style="margin-top:-8px">ℹ️ Se você trabalha em mais de um estúdio, adicione os nomes acima. Eles aparecerão como filtro no Relatório.</div>
   </div>
+
+  <!-- ─── ESTÚDIOS ─── -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="card-title">🏢 Meus Estúdios</div>
+      <button class="btn btn-ghost btn-sm" onclick="openModalStudio()">+ Estúdio</button>
+    </div>
+    <div id="studiosList"></div>
+    <div class="info-box-blue" style="margin-top:8px">ℹ️ Cada estúdio tem grade, presença e relatório separados.</div>
+  </div>
+
   <div class="card">
     <div class="card-title" style="margin-bottom:14px">💾 Backup de Dados</div>
     <button class="btn btn-ghost" onclick="exportar()" style="margin-bottom:10px">📤 Exportar Backup (JSON)</button>
@@ -263,7 +301,7 @@
   </div>
   <div class="card" style="text-align:center;color:var(--text-muted);font-size:.8rem;line-height:1.8">
     <div style="font-size:1.5rem;margin-bottom:4px">🧘</div>
-    <strong>Pilates Control v2.0</strong><br>
+    <strong>Pilates Control v3.0</strong><br>
     Para instalar no celular:<br>
     <em>Menu do Chrome → "Adicionar à tela inicial"</em>
   </div>
@@ -296,15 +334,15 @@
   <div id="relResult"></div>
 </div>
 
-<!-- BOTTOM NAV (6 tabs) -->
+<!-- BOTTOM NAV -->
 <div class="bottom-nav">
-  <button class="bn-btn active" id="bn-home" onclick="showPage('home')"><span>🏠</span>Início</button>
-  <button class="bn-btn" id="bn-grade" onclick="showPage('grade')"><span>🗓️</span>Grade</button>
-  <button class="bn-btn" id="bn-presenca" onclick="showPage('presenca')"><span>✅</span>Presença</button>
-  <button class="bn-btn" id="bn-alunas" onclick="showPage('alunas')"><span>👩</span>Alunas</button>
-  <button class="bn-btn" id="bn-relatorio" onclick="showPage('relatorio')"><span>📊</span>Relatório</button>
-  <button class="bn-btn" id="bn-pagamento" onclick="showPage('pagamento')"><span>💰</span>Pgto</button>
-  <button class="bn-btn" id="bn-config" onclick="showPage('config')"><span>⚙️</span>Config</button>
+  <button class="bn-btn active" id="bn-home"      onclick="showPage('home')"><span>🏠</span>Início</button>
+  <button class="bn-btn"        id="bn-grade"     onclick="showPage('grade')"><span>🗓️</span>Grade</button>
+  <button class="bn-btn"        id="bn-presenca"  onclick="showPage('presenca')"><span>✅</span>Presença</button>
+  <button class="bn-btn"        id="bn-alunas"    onclick="showPage('alunas')"><span>👩</span>Alunas</button>
+  <button class="bn-btn"        id="bn-relatorio" onclick="showPage('relatorio')"><span>📊</span>Relatório</button>
+  <button class="bn-btn"        id="bn-pagamento" onclick="showPage('pagamento')"><span>💰</span>Pgto</button>
+  <button class="bn-btn"        id="bn-config"    onclick="showPage('config')"><span>⚙️</span>Config</button>
 </div>
 
 <button class="fab" id="fabBtn" onclick="fabAction()" title="Nova Aluna">+</button>
@@ -408,35 +446,46 @@
   </div>
 </div>
 
-<!-- MODAL APARELHOS (após marcar presença) -->
+<!-- MODAL APARELHOS -->
 <div class="modal-overlay" id="modalAparelho">
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">🏋️ Qual aparelho foi usado?</div>
     <div id="aparelhoAlunaInfo" style="font-size:.9rem;color:var(--text-muted);margin-bottom:16px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <button class="btn btn-ghost" id="apReformer"   onclick="selecionarAparelho('Reformer')"   style="flex-direction:column;gap:4px;padding:16px 10px">
-        <span style="font-size:1.5rem">🛏️</span><span style="font-size:.82rem;font-weight:700">Reformer</span>
-      </button>
-      <button class="btn btn-ghost" id="apCadillac"   onclick="selecionarAparelho('Cadillac')"   style="flex-direction:column;gap:4px;padding:16px 10px">
-        <span style="font-size:1.5rem">🔧</span><span style="font-size:.82rem;font-weight:700">Cadillac<br><span style="font-size:.72rem;font-weight:400">(Trapézio)</span></span>
-      </button>
-      <button class="btn btn-ghost" id="apChair"      onclick="selecionarAparelho('Chair')"      style="flex-direction:column;gap:4px;padding:16px 10px">
-        <span style="font-size:1.5rem">🪑</span><span style="font-size:.82rem;font-weight:700">Chair<br><span style="font-size:.72rem;font-weight:400">(Wunda Chair)</span></span>
-      </button>
-      <button class="btn btn-ghost" id="apLadder"     onclick="selecionarAparelho('Ladder Barrel')" style="flex-direction:column;gap:4px;padding:16px 10px">
-        <span style="font-size:1.5rem">🪜</span><span style="font-size:.82rem;font-weight:700">Ladder Barrel</span>
-      </button>
+      <button class="btn btn-ghost" id="apReformer"   onclick="selecionarAparelho('Reformer')"      style="flex-direction:column;gap:4px;padding:16px 10px"><span style="font-size:1.5rem">🛏️</span><span style="font-size:.82rem;font-weight:700">Reformer</span></button>
+      <button class="btn btn-ghost" id="apCadillac"   onclick="selecionarAparelho('Cadillac')"      style="flex-direction:column;gap:4px;padding:16px 10px"><span style="font-size:1.5rem">🔧</span><span style="font-size:.82rem;font-weight:700">Cadillac<br><span style="font-size:.72rem;font-weight:400">(Trapézio)</span></span></button>
+      <button class="btn btn-ghost" id="apChair"      onclick="selecionarAparelho('Chair')"         style="flex-direction:column;gap:4px;padding:16px 10px"><span style="font-size:1.5rem">🪑</span><span style="font-size:.82rem;font-weight:700">Chair<br><span style="font-size:.72rem;font-weight:400">(Wunda Chair)</span></span></button>
+      <button class="btn btn-ghost" id="apLadder"     onclick="selecionarAparelho('Ladder Barrel')" style="flex-direction:column;gap:4px;padding:16px 10px"><span style="font-size:1.5rem">🪜</span><span style="font-size:.82rem;font-weight:700">Ladder Barrel</span></button>
     </div>
     <button class="btn btn-ghost" onclick="selecionarAparelho('')" style="font-size:.82rem;color:var(--text-muted)">Pular — registrar sem aparelho</button>
+  </div>
+</div>
+
+<!-- MODAL NOVO/EDITAR ESTÚDIO -->
+<div class="modal-overlay" id="modalStudio">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalStudioTitle">🏢 Novo Estúdio</div>
+    <label>Nome do Estúdio *</label>
+    <input type="text" id="sNome" placeholder="Ex: Studio Centro, Studio Jardins...">
+    <label>Endereço (opcional)</label>
+    <input type="text" id="sEndereco" placeholder="Ex: Rua das Flores, 123">
+    <label>Cor de identificação</label>
+    <div id="colorPicker" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
+    <label>Observações</label>
+    <input type="text" id="sObs" placeholder="Ex: Equipamentos premium, turmas pequenas...">
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="closeModal('modalStudio')">Cancelar</button>
+      <button class="btn btn-primary" style="flex:2" onclick="salvarStudio()">💾 Salvar</button>
+    </div>
   </div>
 </div>
 
 <div id="toast"></div>
 
 <script>
-  // ─── DATABASE ─────────────────────────────────────────────────────────────
-  // ─── HELPERS (declared first to avoid TDZ errors) ──────────────────────────
+  // ─── HELPERS ──────────────────────────────────────────────────────────────
   const save  = () => localStorage.setItem('pilates_db', JSON.stringify(db));
   const uid   = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
   const fmt   = d  => { if(!d)return''; const[y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
@@ -444,33 +493,71 @@
   // ─── DATABASE ─────────────────────────────────────────────────────────────
   let db = JSON.parse(localStorage.getItem('pilates_db') || 'null') || { alunas:[], aulas:[], config:{} };
 
-  // Migration: ensure new fields exist
-  if (!db.grade) db.grade = [];
+  // Migration v1→v2: basic fields
+  if (!db.grade)    db.grade    = [];
   if (!db.presencas) db.presencas = [];
   db.aulas.forEach(a => { if (!a.status) a.status = 'presente'; });
+
+  // ─── MIGRATION v2→v3: studios as entities ─────────────────────────────────
+  // Studios were previously stored as plain strings (config.studio + config.studios[]).
+  // Now they are first-class objects in db.studios[].
+  if (!db.studios) {
+    db.studios = [];
+    const COLORS = ['#a855f7','#ec4899','#3b82f6','#10b981','#f59e0b','#ef4444','#6366f1','#14b8a6'];
+    const collected = [];
+    if (db.config && db.config.studio) collected.push(db.config.studio);
+    if (db.config && db.config.studios && Array.isArray(db.config.studios)) {
+      db.config.studios.forEach(s => { if (s && !collected.includes(s)) collected.push(s); });
+    }
+    collected.forEach((name, i) => {
+      db.studios.push({ id: uid(), nome: name, endereco: '', obs: '', cor: COLORS[i % COLORS.length] });
+    });
+    // Patch grade slots: replace studio string → studioId
+    db.grade.forEach(slot => {
+      if (slot.studio && typeof slot.studio === 'string') {
+        const found = db.studios.find(s => s.nome === slot.studio);
+        slot.studioId = found ? found.id : '';
+        // keep slot.studio as legacy fallback — will be cleared on next save
+      }
+    });
+  }
+  // Ensure all grade slots have studioId field
+  db.grade.forEach(slot => {
+    if (!('studioId' in slot)) slot.studioId = '';
+  });
+
   save();
 
-  let editId = null;
-  let faltaCtx = null;
+  let editId      = null;
+  let editStudioId = null;
+  let faltaCtx    = null;
   let aparelhoCtx = null;
   let gradeEditId = null;
   let reposChoice = 'nao';
-  let activeDayTab = 1;
+  let activeDayTab     = 1;
+  let activeGradeStudio = ''; // '' = all studios in grade view
+  let selectedStudioColor = '#a855f7';
 
-  const DIAS = ['', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  const vals  = () => ({
+  const DIAS  = ['', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const COLORS = ['#a855f7','#ec4899','#3b82f6','#10b981','#f59e0b','#ef4444','#6366f1','#14b8a6','#f97316','#0ea5e9'];
+
+  const vals = () => ({
     Individual: +document.getElementById('vIndividual').value || 80,
     Dupla:      +document.getElementById('vDupla').value      || 50,
     Trio:       +document.getElementById('vTrio').value       || 40,
     Grupo:      +document.getElementById('vGrupo').value      || 30,
   });
 
-  // day of week from ISO date: 1=Mon ... 6=Sat
   function dowFromDate(dateStr) {
-    const d = new Date(dateStr + 'T12:00:00');
-    const js = d.getDay(); // 0=Sun
-    return js === 0 ? 7 : js; // 7=Sun (unused here)
+    const d  = new Date(dateStr + 'T12:00:00');
+    const js = d.getDay();
+    return js === 0 ? 7 : js;
   }
+
+  // Returns studio object or null
+  function studioById(id) { return db.studios.find(s => s.id === id) || null; }
+  function studioName(id) { const s = studioById(id); return s ? s.nome : ''; }
+  function studioCor(id)  { const s = studioById(id); return s ? s.cor  : '#a855f7'; }
 
   // ─── INIT ──────────────────────────────────────────────────────────────────
   window.onload = () => {
@@ -478,18 +565,22 @@
     const y = now.getFullYear(), m = now.getMonth();
     document.getElementById('payDe').value  = new Date(y,m,1).toISOString().slice(0,10);
     document.getElementById('payAte').value = new Date(y,m+1,0).toISOString().slice(0,10);
-    document.getElementById('quickData').value = now.toISOString().slice(0,10);
+    document.getElementById('quickData').value   = now.toISOString().slice(0,10);
     document.getElementById('presencaData').value = now.toISOString().slice(0,10);
     document.getElementById('currentMonth').textContent = now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-    if (db.config.nome)   document.getElementById('cfgNome').value   = db.config.nome;
-    if (db.config.studio) { document.getElementById('cfgStudio').value = db.config.studio; document.getElementById('navStudio').textContent = db.config.studio; }
-    if (db.config.studios && db.config.studios.length) document.getElementById('cfgStudios').value = db.config.studios.join('\n');
-    // Set active day tab to today's weekday
+    if (db.config.nome) document.getElementById('cfgNome').value = db.config.nome;
     const todayDow = dowFromDate(now.toISOString().slice(0,10));
     if (todayDow >= 1 && todayDow <= 6) activeDayTab = todayDow;
+    updateNavStudio();
     initRelatorio();
     renderAll();
   };
+
+  function updateNavStudio() {
+    const el = document.getElementById('navStudio');
+    const cnt = db.studios.length;
+    el.textContent = cnt === 0 ? '' : cnt === 1 ? db.studios[0].nome : `${cnt} estúdios`;
+  }
 
   // ─── PAGE NAV ──────────────────────────────────────────────────────────────
   function showPage(p) {
@@ -501,18 +592,144 @@
     if (p === 'grade') {
       fab.style.display='flex'; fab.textContent='＋'; fab.title='Novo Horário';
       fab.onclick = () => openModalGrade();
+    } else if (p === 'config') {
+      fab.style.display='flex'; fab.textContent='＋'; fab.title='Novo Estúdio';
+      fab.onclick = () => openModalStudio();
     } else {
       fab.style.display='flex'; fab.textContent='＋'; fab.title='Nova Aluna';
       fab.onclick = () => openModalAluna();
     }
   }
-
   function fabAction() { openModalAluna(); }
 
   // ─── RENDER ALL ───────────────────────────────────────────────────────────
   function renderAll() {
     renderStats(); renderUltimas(); renderQuickSel(); renderAlunas();
     renderPagamento(); renderRelatorio(); renderGrade(); renderPresenca();
+    renderStudiosList(); renderStudioSelects();
+  }
+
+  // ─── STUDIOS LIST (Config page) ────────────────────────────────────────────
+  function renderStudiosList() {
+    const el = document.getElementById('studiosList');
+    if (!db.studios.length) {
+      el.innerHTML = '<div class="empty" style="padding:20px"><span class="empty-icon">🏢</span>Nenhum estúdio cadastrado ainda</div>';
+      return;
+    }
+    el.innerHTML = db.studios.map(s => {
+      const slotCount = db.grade.filter(g => g.studioId === s.id).length;
+      return `<div class="studio-item">
+        <div class="studio-color-dot" style="background:${s.cor}"></div>
+        <div class="studio-info">
+          <div class="studio-name">${s.nome}</div>
+          <div class="studio-meta">${s.endereco ? s.endereco + ' · ' : ''}${slotCount} horário${slotCount!==1?'s':''} na grade</div>
+          ${s.obs ? `<div class="studio-meta" style="font-style:italic">${s.obs}</div>` : ''}
+        </div>
+        <div class="studio-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openModalStudio('${s.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirStudio('${s.id}')">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Rebuild all <select> elements that reference studios
+  function renderStudioSelects() {
+    const makeOpts = (incAll, curVal) => {
+      let html = incAll ? '<option value="">Todos os Estúdios</option>' : '<option value="">— Sem estúdio específico —</option>';
+      html += db.studios.map(s => `<option value="${s.id}"${s.id===curVal?' selected':''}>${s.nome}</option>`).join('');
+      return html;
+    };
+
+    // Presença filter
+    const pSel = document.getElementById('presencaStudioFilter');
+    const pCur = pSel.value;
+    pSel.innerHTML = makeOpts(true, pCur);
+
+    // Pagamento filter
+    const pgSel = document.getElementById('payStudioFilter');
+    const pgCur = pgSel.value;
+    pgSel.innerHTML = makeOpts(true, pgCur);
+
+    // Grade modal
+    const gSel = document.getElementById('gStudio');
+    if (gSel) {
+      const gCur = gSel.value;
+      gSel.innerHTML = makeOpts(false, gCur);
+    }
+
+    // Relatório filter
+    const rSel = document.getElementById('relStudio');
+    if (rSel) {
+      const rCur = rSel.value;
+      rSel.innerHTML = makeOpts(true, rCur);
+    }
+  }
+
+  // ─── MODAL ESTÚDIO ────────────────────────────────────────────────────────
+  function openModalStudio(id) {
+    editStudioId = id || null;
+    selectedStudioColor = id ? (studioById(id)?.cor || COLORS[0]) : COLORS[db.studios.length % COLORS.length];
+
+    // Build color picker
+    const cp = document.getElementById('colorPicker');
+    cp.innerHTML = COLORS.map(c => `
+      <div onclick="pickColor('${c}')" id="cp_${c.replace('#','')}"
+        style="width:32px;height:32px;border-radius:50%;background:${c};cursor:pointer;
+               border:3px solid ${c===selectedStudioColor?'#1e1b2e':'transparent'};
+               transition:border .15s;"></div>`).join('');
+
+    if (id) {
+      const s = studioById(id);
+      document.getElementById('sNome').value     = s.nome;
+      document.getElementById('sEndereco').value = s.endereco || '';
+      document.getElementById('sObs').value      = s.obs || '';
+      document.getElementById('modalStudioTitle').textContent = '✏️ Editar Estúdio';
+    } else {
+      document.getElementById('sNome').value     = '';
+      document.getElementById('sEndereco').value = '';
+      document.getElementById('sObs').value      = '';
+      document.getElementById('modalStudioTitle').textContent = '🏢 Novo Estúdio';
+    }
+    document.getElementById('modalStudio').classList.add('open');
+  }
+
+  function pickColor(c) {
+    selectedStudioColor = c;
+    document.querySelectorAll('#colorPicker > div').forEach(el => {
+      const elColor = '#' + el.id.replace('cp_','');
+      el.style.border = `3px solid ${elColor === c ? '#1e1b2e' : 'transparent'}`;
+    });
+  }
+
+  function salvarStudio() {
+    const nome = document.getElementById('sNome').value.trim();
+    if (!nome) { toast('⚠️ Informe o nome do estúdio'); return; }
+    const data = {
+      nome,
+      endereco: document.getElementById('sEndereco').value.trim(),
+      obs:      document.getElementById('sObs').value.trim(),
+      cor:      selectedStudioColor,
+    };
+    if (editStudioId) {
+      Object.assign(db.studios.find(s => s.id === editStudioId), data);
+      toast('✅ Estúdio atualizado!');
+    } else {
+      db.studios.push({ id: uid(), ...data });
+      toast('✅ Estúdio cadastrado!');
+    }
+    save(); renderAll(); closeModal('modalStudio'); updateNavStudio();
+  }
+
+  function excluirStudio(id) {
+    const slotCount = db.grade.filter(g => g.studioId === id).length;
+    const msg = slotCount
+      ? `Este estúdio tem ${slotCount} horário(s) na grade. Os horários perderão a associação. Continuar?`
+      : 'Excluir este estúdio?';
+    if (!confirm(msg)) return;
+    db.studios  = db.studios.filter(s => s.id !== id);
+    db.grade.forEach(g => { if (g.studioId === id) g.studioId = ''; });
+    save(); renderAll(); toast('🗑️ Estúdio removido'); updateNavStudio();
   }
 
   // ─── STATS ────────────────────────────────────────────────────────────────
@@ -520,11 +737,9 @@
     const today = new Date().toISOString().slice(0,10);
     const mes   = today.slice(0,7);
     const v     = vals();
-    // Count presences from new presencas + old aulas
     const allPresentes = getAllPresentes();
     const hoje  = allPresentes.filter(a=>a.data===today).length;
     const aMes  = allPresentes.filter(a=>a.data.startsWith(mes)).length;
-    // Only regular plans contribute to revenue
     const regularMes = allPresentes.filter(a => {
       const al = db.alunas.find(x=>x.id===a.alunaId);
       return a.data.startsWith(mes) && (!al || !al.convenio || al.convenio === 'regular');
@@ -538,7 +753,6 @@
       <div class="stat-card"><div class="stat-value">R$ ${ganho}</div><div class="stat-label">Receita do Mês</div></div>`;
   }
 
-  // Returns unified list of presences (old aulas + new presencas with status=presente)
   function getAllPresentes() {
     const fromOld = db.aulas.filter(a=>a.status==='presente').map(a=>({...a, source:'aula'}));
     const fromNew = db.presencas.filter(p=>p.status==='presente').map(p=>({...p, source:'presenca'}));
@@ -552,13 +766,19 @@
     const el = document.getElementById('ultimasAulas');
     if (!ul.length) { el.innerHTML='<div class="empty"><span class="empty-icon">📋</span>Nenhuma aula registrada ainda</div>'; return; }
     el.innerHTML = ul.map(a => {
-      const al = db.alunas.find(x=>x.id===a.alunaId);
+      const al   = db.alunas.find(x=>x.id===a.alunaId);
       const conv = al?.convenio;
-      const convBadge = conv === 'totalpass' ? '<span class="plan-badge plan-totalpass">TotalPass</span>'
-                      : conv === 'wellhub'   ? '<span class="plan-badge plan-wellhub">Wellhub</span>' : '';
+      const convBadge = conv==='totalpass'?'<span class="plan-badge plan-totalpass">TotalPass</span>'
+                      : conv==='wellhub'  ?'<span class="plan-badge plan-wellhub">Wellhub</span>':'';
+      // Studio from presenca's slot
+      const slot = a.slotId ? db.grade.find(s=>s.id===a.slotId) : null;
+      const studioTag = slot?.studioId ? `<span style="font-size:.74rem;color:${studioCor(slot.studioId)};font-weight:700;margin-left:4px">🏢 ${studioName(slot.studioId)}</span>` : '';
       return `<div class="log-item" style="flex-direction:column;align-items:flex-start;gap:4px">
         <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
-          <div><div class="log-name">${al?al.nome:'—'}${convBadge}</div><div class="log-date">${fmt(a.data)} · <span class="log-type">${a.tipo}</span></div></div>
+          <div>
+            <div class="log-name">${al?al.nome:'—'}${convBadge}</div>
+            <div class="log-date">${fmt(a.data)} · <span class="log-type">${a.tipo}</span>${studioTag}</div>
+          </div>
           ${a.source==='aula'?`<button onclick="excluirAula('${a.id}')" class="btn btn-danger btn-sm">✕</button>`:''}
         </div>
         ${a.aparelhos?`<div style="font-size:.77rem;color:var(--text-muted)">🏋️ ${a.aparelhos}</div>`:''}
@@ -587,31 +807,47 @@
 
   // ─── GRADE HORÁRIA ────────────────────────────────────────────────────────
   function renderGrade() {
+    // Studio filter bar
+    const sfEl = document.getElementById('gradeStudioFilter');
+    sfEl.innerHTML = `<div class="sf-btn${activeGradeStudio===''?' active':''}" onclick="setGradeStudio('')">Todos</div>` +
+      db.studios.map(s => `<div class="sf-btn${activeGradeStudio===s.id?' active':''}"
+        style="${activeGradeStudio===s.id?`background:${s.cor};border-color:${s.cor};color:#fff`:''}"
+        onclick="setGradeStudio('${s.id}')">${s.nome}</div>`).join('');
+
     // Day tabs
     const tabsEl = document.getElementById('dayTabs');
     tabsEl.innerHTML = [1,2,3,4,5,6].map(d=>`
       <div class="day-tab${activeDayTab===d?' active':''}" onclick="setDayTab(${d})">${DIAS[d]}</div>`).join('');
 
-    const slots = db.grade.filter(s=>s.dia===activeDayTab).sort((a,b)=>a.hora.localeCompare(b.hora));
+    let slots = db.grade.filter(s=>s.dia===activeDayTab);
+    if (activeGradeStudio !== '') slots = slots.filter(s=>s.studioId===activeGradeStudio);
+    slots.sort((a,b)=>a.hora.localeCompare(b.hora));
+
     const el = document.getElementById('gradeSlots');
     if (!slots.length) {
-      el.innerHTML=`<div class="empty"><span class="empty-icon">🗓️</span>Nenhum horário cadastrado para ${DIAS[activeDayTab]}<br><small>Toque em "+ Horário" para adicionar</small></div>`;
+      const filterLabel = activeGradeStudio ? ` em "${studioName(activeGradeStudio)}"` : '';
+      el.innerHTML=`<div class="empty"><span class="empty-icon">🗓️</span>Nenhum horário cadastrado para ${DIAS[activeDayTab]}${filterLabel}<br><small>Toque em "+ Horário" para adicionar</small></div>`;
       return;
     }
     el.innerHTML = slots.map(slot => {
+      const st = slot.studioId ? studioById(slot.studioId) : null;
+      const studioPill = st
+        ? `<span class="studio-badge-pill" style="background:${st.cor}22;color:${st.cor}"><span style="width:7px;height:7px;border-radius:50%;background:${st.cor};display:inline-block"></span>${st.nome}</span>`
+        : '';
       const alunas = (slot.alunaIds||[]).map(id=>{
         const al = db.alunas.find(a=>a.id===id);
         if (!al) return '';
-        const conv = al.convenio;
+        const conv  = al.convenio;
         const badge = conv==='totalpass'?'<span class="badge badge-blue" style="font-size:.65rem">TP</span>'
-                    : conv==='wellhub'?'<span class="badge badge-green" style="font-size:.65rem">WH</span>':'';
-        return `<div class="slot-student">
-          <span class="slot-student-name">${al.nome} ${badge}</span>
-        </div>`;
+                    : conv==='wellhub'  ?'<span class="badge badge-green" style="font-size:.65rem">WH</span>':'';
+        return `<div class="slot-student"><span class="slot-student-name">${al.nome} ${badge}</span></div>`;
       }).join('');
       return `<div class="slot-card">
         <div class="slot-time">
-          <span>⏰ ${slot.hora} · ${slot.tipo}${slot.studio?` · <span style="font-size:.75rem;color:#9ca3af">🏢 ${slot.studio}</span>`:''}</span>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span>⏰ ${slot.hora} · ${slot.tipo}</span>
+            ${studioPill}
+          </div>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-sm" onclick="editGradeSlot('${slot.id}')">✏️</button>
             <button class="btn btn-danger btn-sm" onclick="excluirGrade('${slot.id}')">🗑️</button>
@@ -624,15 +860,13 @@
     }).join('');
   }
 
-  function setDayTab(d) { activeDayTab = d; renderGrade(); }
+  function setDayTab(d)        { activeDayTab = d; renderGrade(); }
+  function setGradeStudio(id)  { activeGradeStudio = id; renderGrade(); }
 
   function openModalGrade(id) {
     gradeEditId = id || null;
-    // Populate studio dropdown
-    const studioSel = document.getElementById('gStudio');
-    const allStudios = [db.config.studio, ...(db.config.studios||[])].filter(Boolean);
-    studioSel.innerHTML = '<option value="">— Sem estúdio específico —</option>' +
-      allStudios.map(s=>`<option value="${s}">${s}</option>`).join('');
+    // Rebuild studio select first
+    renderStudioSelects();
 
     // Build aluna checkboxes
     const checksEl = document.getElementById('gAlunasSel');
@@ -645,17 +879,17 @@
 
     if (id) {
       const s = db.grade.find(g=>g.id===id);
-      document.getElementById('gDia').value  = s.dia;
-      document.getElementById('gHora').value = s.hora;
-      document.getElementById('gTipo').value = s.tipo;
-      document.getElementById('gStudio').value = s.studio || '';
+      document.getElementById('gDia').value    = s.dia;
+      document.getElementById('gHora').value   = s.hora;
+      document.getElementById('gTipo').value   = s.tipo;
+      document.getElementById('gStudio').value = s.studioId || '';
       (s.alunaIds||[]).forEach(aid => { const el = document.getElementById('gal_'+aid); if(el) el.checked=true; });
       document.getElementById('modalGradeTitle').textContent = '✏️ Editar Horário';
     } else {
-      document.getElementById('gDia').value  = activeDayTab;
-      document.getElementById('gHora').value = '07:00';
-      document.getElementById('gTipo').value = 'Individual';
-      document.getElementById('gStudio').value = '';
+      document.getElementById('gDia').value    = activeDayTab;
+      document.getElementById('gHora').value   = '07:00';
+      document.getElementById('gTipo').value   = 'Individual';
+      document.getElementById('gStudio').value = activeGradeStudio || '';
       document.getElementById('modalGradeTitle').textContent = '➕ Novo Horário';
     }
     document.getElementById('modalGrade').classList.add('open');
@@ -667,14 +901,14 @@
     const dia      = +document.getElementById('gDia').value;
     const hora     = document.getElementById('gHora').value;
     const tipo     = document.getElementById('gTipo').value;
-    const studio   = document.getElementById('gStudio').value;
+    const studioId = document.getElementById('gStudio').value;
     const alunaIds = [...document.querySelectorAll('#gAlunasSel input[type=checkbox]:checked')].map(c=>c.value);
     if (!hora) { toast('⚠️ Informe o horário'); return; }
     if (gradeEditId) {
-      Object.assign(db.grade.find(g=>g.id===gradeEditId), { dia, hora, tipo, studio, alunaIds });
+      Object.assign(db.grade.find(g=>g.id===gradeEditId), { dia, hora, tipo, studioId, alunaIds });
       toast('✅ Horário atualizado!');
     } else {
-      db.grade.push({ id:uid(), dia, hora, tipo, studio, alunaIds });
+      db.grade.push({ id:uid(), dia, hora, tipo, studioId, alunaIds });
       toast('✅ Horário cadastrado!');
     }
     save(); renderGrade(); closeModal('modalGrade');
@@ -688,14 +922,16 @@
 
   // ─── PRESENÇA DO DIA ──────────────────────────────────────────────────────
   function renderPresenca() {
-    const dateStr = document.getElementById('presencaData').value;
+    const dateStr       = document.getElementById('presencaData').value;
+    const studioFilter  = document.getElementById('presencaStudioFilter')?.value || '';
     if (!dateStr) return;
     const dow = dowFromDate(dateStr);
-    const slots = db.grade.filter(s=>s.dia===dow).sort((a,b)=>a.hora.localeCompare(b.hora));
+    let slots = db.grade.filter(s=>s.dia===dow);
+    if (studioFilter) slots = slots.filter(s=>s.studioId===studioFilter);
+    slots.sort((a,b)=>a.hora.localeCompare(b.hora));
     const el = document.getElementById('presencaSlots');
 
     if (!slots.length) {
-      // Show which days DO have slots to help user navigate
       const daysWithSlots = [...new Set(db.grade.map(s=>s.dia))].sort();
       const dayHints = daysWithSlots.length
         ? `<div style="margin-top:10px;font-size:.82rem;color:var(--primary);font-weight:600">Dias com aulas cadastradas: ${daysWithSlots.map(d=>DIAS[d]).join(', ')}</div>`
@@ -705,15 +941,18 @@
     }
 
     el.innerHTML = slots.map(slot => {
+      const st = slot.studioId ? studioById(slot.studioId) : null;
+      const studioPill = st
+        ? `<span style="font-size:.74rem;font-weight:700;color:${st.cor}">🏢 ${st.nome}</span>`
+        : '';
       const alunas = (slot.alunaIds||[]).map(alunaId => {
-        const al = db.alunas.find(a=>a.id===alunaId);
+        const al   = db.alunas.find(a=>a.id===alunaId);
         if (!al) return '';
         const prec   = db.presencas.find(p=>p.slotId===slot.id&&p.alunaId===alunaId&&p.data===dateStr);
         const status = prec ? prec.status : null;
         const conv   = al.convenio;
         const badge  = conv==='totalpass'?'<span class="badge badge-blue" style="font-size:.65rem;margin-left:4px">TP</span>'
                      : conv==='wellhub'  ?'<span class="badge badge-green" style="font-size:.65rem;margin-left:4px">WH</span>':'';
-
         let statusLine = '';
         if (status === 'presente') {
           const apLabel = prec.aparelho ? `<span style="font-size:.74rem;background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:10px;font-weight:700;margin-left:4px">🏋️ ${prec.aparelho}</span>` : '';
@@ -725,10 +964,8 @@
         } else {
           statusLine = '<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px;font-style:italic">← deslize para marcar →</div>';
         }
-
         const cardClass = status ? 'swipe-card status-'+status : 'swipe-card';
         const swipeId   = `sw_${slot.id}_${alunaId}`;
-
         return `<div class="swipe-wrap" id="wrap_${swipeId}">
           <div class="swipe-bg swipe-bg-left"  id="bgl_${swipeId}"><span class="swipe-bg-label">✅ Presente</span></div>
           <div class="swipe-bg swipe-bg-right" id="bgr_${swipeId}"><span class="swipe-bg-label">Falta ❌</span></div>
@@ -743,16 +980,15 @@
           </div>
         </div>`;
       }).join('');
-
       return `<div class="slot-card">
-        <div class="slot-time"><span>⏰ ${slot.hora} · ${slot.tipo}</span></div>
-        <div class="slot-students">
-          ${alunas || '<div class="slot-empty">Nenhuma aluna neste horário</div>'}
+        <div class="slot-time">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span>⏰ ${slot.hora} · ${slot.tipo}</span>${studioPill}
+          </div>
         </div>
+        <div class="slot-students">${alunas || '<div class="slot-empty">Nenhuma aluna neste horário</div>'}</div>
       </div>`;
     }).join('');
-
-    // Attach swipe listeners after render
     attachSwipeListeners();
   }
 
@@ -764,61 +1000,32 @@
   // ─── SWIPE LOGIC ──────────────────────────────────────────────────────────
   function attachSwipeListeners() {
     document.querySelectorAll('.swipe-card').forEach(card => {
-      let startX = 0, currentX = 0, isDragging = false;
-      const THRESHOLD = 80; // px to trigger action
-
+      let startX=0, currentX=0, isDragging=false;
+      const THRESHOLD = 80;
       const slotId  = card.dataset.slot;
       const alunaId = card.dataset.aluna;
       const dateStr = card.dataset.date;
       const tipo    = card.dataset.tipo;
       const swipeId = card.id;
-      const bgl = document.getElementById('bgl_' + swipeId);
-      const bgr = document.getElementById('bgr_' + swipeId);
-
-      function onStart(x) {
-        startX = x; currentX = 0; isDragging = true;
-        card.classList.remove('snap-back');
-      }
-      function onMove(x) {
-        if (!isDragging) return;
-        currentX = x - startX;
-        card.style.transform = `translateX(${currentX}px)`;
-        const pct = Math.min(1, Math.abs(currentX) / THRESHOLD);
-        if (currentX > 0) { bgl.style.opacity = pct; bgr.style.opacity = 0; }
-        else               { bgr.style.opacity = pct; bgl.style.opacity = 0; }
-      }
-      function onEnd() {
-        if (!isDragging) return;
-        isDragging = false;
-        bgl.style.opacity = 0; bgr.style.opacity = 0;
-        card.classList.add('snap-back');
-        card.style.transform = '';
-        if (currentX > THRESHOLD) {
-          // Swipe right → abrir modal de aparelho
-          abrirModalAparelho(slotId, alunaId, dateStr, tipo);
-        } else if (currentX < -THRESHOLD) {
-          // Swipe left → falta modal
-          abrirModalFalta(slotId, alunaId, dateStr, tipo);
-        }
-      }
-
-      // Touch
-      card.addEventListener('touchstart', e=>onStart(e.touches[0].clientX), {passive:true});
-      card.addEventListener('touchmove',  e=>onMove(e.touches[0].clientX),  {passive:true});
-      card.addEventListener('touchend',   onEnd);
-      // Mouse (desktop)
-      card.addEventListener('mousedown',  e=>onStart(e.clientX));
-      card.addEventListener('mousemove',  e=>{ if(isDragging) onMove(e.clientX); });
-      card.addEventListener('mouseup',    onEnd);
-      card.addEventListener('mouseleave', e=>{ if(isDragging) onEnd(); });
+      const bgl = document.getElementById('bgl_'+swipeId);
+      const bgr = document.getElementById('bgr_'+swipeId);
+      function onStart(x) { startX=x; currentX=0; isDragging=true; card.classList.remove('snap-back'); }
+      function onMove(x)  { if(!isDragging)return; currentX=x-startX; card.style.transform=`translateX(${currentX}px)`; const pct=Math.min(1,Math.abs(currentX)/THRESHOLD); if(currentX>0){bgl.style.opacity=pct;bgr.style.opacity=0;}else{bgr.style.opacity=pct;bgl.style.opacity=0;} }
+      function onEnd()    { if(!isDragging)return; isDragging=false; bgl.style.opacity=0; bgr.style.opacity=0; card.classList.add('snap-back'); card.style.transform=''; if(currentX>THRESHOLD)abrirModalAparelho(slotId,alunaId,dateStr,tipo); else if(currentX<-THRESHOLD)abrirModalFalta(slotId,alunaId,dateStr,tipo); }
+      card.addEventListener('touchstart',e=>onStart(e.touches[0].clientX),{passive:true});
+      card.addEventListener('touchmove', e=>onMove(e.touches[0].clientX), {passive:true});
+      card.addEventListener('touchend',  onEnd);
+      card.addEventListener('mousedown', e=>onStart(e.clientX));
+      card.addEventListener('mousemove', e=>{ if(isDragging)onMove(e.clientX); });
+      card.addEventListener('mouseup',   onEnd);
+      card.addEventListener('mouseleave',e=>{ if(isDragging)onEnd(); });
     });
   }
 
   function marcarPresenca(slotId, alunaId, data, status, tipo, aparelho) {
     const idx = db.presencas.findIndex(p=>p.slotId===slotId&&p.alunaId===alunaId&&p.data===data);
     const rec = { id: idx>=0 ? db.presencas[idx].id : uid(), slotId, alunaId, data, status, tipo, aparelho: aparelho||'' };
-    if (idx >= 0) db.presencas[idx] = rec;
-    else db.presencas.push(rec);
+    if (idx>=0) db.presencas[idx]=rec; else db.presencas.push(rec);
     save(); renderPresenca(); renderStats(); renderUltimas(); toast('✅ Presença registrada!');
   }
 
@@ -827,20 +1034,17 @@
     const al = db.alunas.find(a=>a.id===alunaId);
     aparelhoCtx = { slotId, alunaId, data, tipo };
     document.getElementById('aparelhoAlunaInfo').textContent = `${al?al.nome:'—'} · ${fmt(data)}`;
-    // Reset button styles
     ['apReformer','apCadillac','apChair','apLadder'].forEach(id=>{
       document.getElementById(id).classList.remove('btn-primary');
       document.getElementById(id).classList.add('btn-ghost');
     });
     document.getElementById('modalAparelho').classList.add('open');
   }
-
   function selecionarAparelho(aparelho) {
-    if (!aparelhoCtx) return;
-    const { slotId, alunaId, data, tipo } = aparelhoCtx;
-    marcarPresenca(slotId, alunaId, data, 'presente', tipo, aparelho);
-    closeModal('modalAparelho');
-    aparelhoCtx = null;
+    if(!aparelhoCtx)return;
+    const{slotId,alunaId,data,tipo}=aparelhoCtx;
+    marcarPresenca(slotId,alunaId,data,'presente',tipo,aparelho);
+    closeModal('modalAparelho'); aparelhoCtx=null;
   }
 
   // ─── MODAL FALTA ──────────────────────────────────────────────────────────
@@ -856,30 +1060,22 @@
     document.getElementById('togReposSim').className = 'toggle-opt';
     document.getElementById('modalFalta').classList.add('open');
   }
-
   function toggleRepos(choice) {
-    reposChoice = choice;
-    document.getElementById('togReposNao').className = 'toggle-opt' + (choice==='nao'?' active-danger':'');
-    document.getElementById('togReposSim').className = 'toggle-opt' + (choice==='sim'?' active':'');
-    document.getElementById('reposDateRow').classList.toggle('hidden', choice !== 'sim');
+    reposChoice=choice;
+    document.getElementById('togReposNao').className='toggle-opt'+(choice==='nao'?' active-danger':'');
+    document.getElementById('togReposSim').className='toggle-opt'+(choice==='sim'?' active':'');
+    document.getElementById('reposDateRow').classList.toggle('hidden',choice!=='sim');
   }
-
   function confirmarFalta() {
-    if (!faltaCtx) return;
-    const { slotId, alunaId, data, tipo } = faltaCtx;
+    if(!faltaCtx)return;
+    const{slotId,alunaId,data,tipo}=faltaCtx;
     const motivo    = document.getElementById('faltaMotivo').value.trim();
     const reposicao = reposChoice;
-    const reposData = reposChoice === 'sim' ? document.getElementById('faltaReposData').value : null;
-
-    const idx = db.presencas.findIndex(p=>p.slotId===slotId&&p.alunaId===alunaId&&p.data===data);
-    const rec = {
-      id: idx>=0 ? db.presencas[idx].id : uid(),
-      slotId, alunaId, data, tipo, status:'falta', motivo, reposicao, reposData
-    };
-    if (idx >= 0) db.presencas[idx] = rec;
-    else db.presencas.push(rec);
-    save(); renderPresenca(); renderStats(); closeModal('modalFalta');
-    toast('❌ Falta registrada');
+    const reposData = reposChoice==='sim'?document.getElementById('faltaReposData').value:null;
+    const idx=db.presencas.findIndex(p=>p.slotId===slotId&&p.alunaId===alunaId&&p.data===data);
+    const rec={id:idx>=0?db.presencas[idx].id:uid(),slotId,alunaId,data,tipo,status:'falta',motivo,reposicao,reposData};
+    if(idx>=0)db.presencas[idx]=rec; else db.presencas.push(rec);
+    save(); renderPresenca(); renderStats(); closeModal('modalFalta'); toast('❌ Falta registrada');
   }
 
   // ─── LISTA DE ALUNAS ──────────────────────────────────────────────────────
@@ -893,15 +1089,15 @@
       return;
     }
     el.innerHTML = list.map(a => {
-      const allP    = getAllPresentes();
-      const auls    = allP.filter(x=>x.alunaId===a.id);
-      const mes_qt  = auls.filter(x=>x.data.startsWith(mes)).length;
-      const esp     = a.plano * 4;
-      const pct     = Math.min(100, Math.round(mes_qt/esp*100));
-      const cls     = pct>=80?'badge-ok':pct>=40?'badge-warn':'badge-danger';
-      const conv = a.convenio;
-      const convLabel = conv==='totalpass'?'TotalPass': conv==='wellhub'?'Wellhub':`${a.plano}x/sem · ${a.tipo}`;
-      const planClass = conv==='totalpass'?'totalpass': conv==='wellhub'?'wellhub':'';
+      const allP   = getAllPresentes();
+      const auls   = allP.filter(x=>x.alunaId===a.id);
+      const mes_qt = auls.filter(x=>x.data.startsWith(mes)).length;
+      const esp    = a.plano * 4;
+      const pct    = Math.min(100, Math.round(mes_qt/esp*100));
+      const cls    = pct>=80?'badge-ok':pct>=40?'badge-warn':'badge-danger';
+      const conv   = a.convenio;
+      const convLabel  = conv==='totalpass'?'TotalPass': conv==='wellhub'?'Wellhub':`${a.plano}x/sem · ${a.tipo}`;
+      const planClass  = conv==='totalpass'?'totalpass': conv==='wellhub'?'wellhub':'';
       return `<div class="aluna-item" onclick="openDetalhe('${a.id}')">
         <div class="aluna-header">
           <span class="aluna-name">${a.nome}</span>
@@ -938,17 +1134,10 @@
     }
     document.getElementById('modalAluna').classList.add('open');
   }
-
   function salvarAluna() {
     const nome = document.getElementById('aNome').value.trim();
     if (!nome) { toast('⚠️ Informe o nome'); return; }
-    const data = {
-      nome, tel:     document.getElementById('aTel').value,
-      plano: +document.getElementById('aPlano').value,
-      tipo:  document.getElementById('aTipo').value,
-      convenio: document.getElementById('aConvenio').value || 'regular',
-      obs:   document.getElementById('aObs').value,
-    };
+    const data = { nome, tel: document.getElementById('aTel').value, plano: +document.getElementById('aPlano').value, tipo: document.getElementById('aTipo').value, convenio: document.getElementById('aConvenio').value||'regular', obs: document.getElementById('aObs').value };
     if (editId) { Object.assign(db.alunas.find(a=>a.id===editId), data); toast('✅ Aluna atualizada!'); }
     else { db.alunas.push({ id:uid(), ...data }); toast('✅ Aluna cadastrada!'); }
     save(); renderAll(); closeModal('modalAluna');
@@ -962,16 +1151,12 @@
     const mes  = new Date().toISOString().slice(0,7);
     const v    = vals();
     const aMes = auls.filter(a=>a.data.startsWith(mes));
-    const isConv = al.convenio === 'totalpass' || al.convenio === 'wellhub';
-    const ganho = isConv ? 0 : aMes.reduce((s,a)=>s+(v[a.tipo]||0),0);
+    const isConv = al.convenio==='totalpass'||al.convenio==='wellhub';
+    const ganho  = isConv ? 0 : aMes.reduce((s,a)=>s+(v[a.tipo]||0),0);
     const convBadge = al.convenio==='totalpass'?'<span class="badge badge-blue">TotalPass</span>'
-                    : al.convenio==='wellhub'?'<span class="badge badge-green">Wellhub</span>':'';
-    // Count faltas this month
+                    : al.convenio==='wellhub'  ?'<span class="badge badge-green">Wellhub</span>':'';
     const faltasMes = db.presencas.filter(p=>p.alunaId===id&&p.status==='falta'&&p.data.startsWith(mes)).length;
-
-    // Recent presencas (from new system)
     const recentPrecs = db.presencas.filter(p=>p.alunaId===id).sort((a,b)=>b.data.localeCompare(a.data)).slice(0,20);
-
     document.getElementById('detalheContent').innerHTML = `
       <div class="modal-title">${al.nome} ${convBadge}</div>
       ${al.tel?`<p style="font-size:.85rem;color:var(--text-muted);margin-bottom:8px">📞 ${al.tel}</p>`:''}
@@ -989,14 +1174,13 @@
       ${recentPrecs.length ? `
       <div class="card-title" style="margin-bottom:8px;font-size:.88rem">Histórico (Grade)</div>
       ${recentPrecs.map(p=>{
-        const reposLabel = p.status==='falta' ? (p.reposicao==='sim'?'<span class="badge badge-warn" style="font-size:.65rem">Repos.</span>':'<span class="badge badge-danger" style="font-size:.65rem">Sem repos.</span>'):'';
+        const slot = p.slotId ? db.grade.find(s=>s.id===p.slotId) : null;
+        const stLabel = slot?.studioId ? `<span style="font-size:.72rem;color:${studioCor(slot.studioId)}"> · 🏢 ${studioName(slot.studioId)}</span>` : '';
+        const reposLabel=p.status==='falta'?(p.reposicao==='sim'?'<span class="badge badge-warn" style="font-size:.65rem">Repos.</span>':'<span class="badge badge-danger" style="font-size:.65rem">Sem repos.</span>'):'';
         return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-weight:700;font-size:.88rem">${fmt(p.data)}</span>
-            <div style="display:flex;gap:4px;align-items:center">
-              ${reposLabel}
-              <span class="${p.status==='presente'?'badge badge-ok':'badge badge-danger'}">${p.status==='presente'?'✅ Presente':'❌ Falta'}</span>
-            </div>
+            <span style="font-weight:700;font-size:.88rem">${fmt(p.data)}${stLabel}</span>
+            <div style="display:flex;gap:4px;align-items:center">${reposLabel}<span class="${p.status==='presente'?'badge badge-ok':'badge badge-danger'}">${p.status==='presente'?'✅ Presente':'❌ Falta'}</span></div>
           </div>
           ${p.status==='falta'&&p.motivo?`<div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">📝 ${p.motivo}</div>`:''}
           ${p.status==='presente'&&p.aparelho?`<div style="font-size:.75rem;color:var(--primary);margin-top:3px">🏋️ ${p.aparelho}</div>`:''}
@@ -1014,74 +1198,64 @@
             </div>
           </div>
           ${a.aparelhos?`<div style="font-size:.78rem;color:var(--text-muted);padding-left:2px">🏋️ ${a.aparelhos}</div>`:''}
-        </div>`).join('')||'<div style="color:var(--text-muted);font-size:.85rem;padding:8px 0">Nenhuma aula avulsa</div>'}
-    `;
-    document.getElementById('btnExcluir').onclick = ()=>excluirAluna(id);
+        </div>`).join('')||'<div style="color:var(--text-muted);font-size:.85rem;padding:8px 0">Nenhuma aula avulsa</div>'}`;
+    document.getElementById('btnExcluir').onclick=()=>excluirAluna(id);
     document.getElementById('modalDetalhe').classList.add('open');
   }
 
   function editarAparelhos(aulaId, alunaId) {
-    const aula = db.aulas.find(a=>a.id===aulaId);
-    if (!aula) return;
-    const val = prompt('Aparelhos / Exercícios da aula:', aula.aparelhos||'');
-    if (val === null) return;
-    aula.aparelhos = val.trim();
-    save(); renderAll(); toast('✅ Aparelhos salvos!'); openDetalhe(alunaId);
+    const aula=db.aulas.find(a=>a.id===aulaId); if(!aula)return;
+    const val=prompt('Aparelhos / Exercícios da aula:',aula.aparelhos||''); if(val===null)return;
+    aula.aparelhos=val.trim(); save(); renderAll(); toast('✅ Aparelhos salvos!'); openDetalhe(alunaId);
   }
-
   function addAulaManual(alunaId) {
-    const al   = db.alunas.find(a=>a.id===alunaId);
-    const data = prompt('Data da aula (AAAA-MM-DD):', new Date().toISOString().slice(0,10));
-    if (!data) return;
-    const aparelhos = prompt('Aparelhos / Exercícios (opcional):', '') || '';
-    db.aulas.push({ id:uid(), alunaId, data, tipo:al.tipo, aparelhos, status:'presente' });
+    const al=db.alunas.find(a=>a.id===alunaId);
+    const data=prompt('Data da aula (AAAA-MM-DD):',new Date().toISOString().slice(0,10)); if(!data)return;
+    const aparelhos=prompt('Aparelhos / Exercícios (opcional):','')||'';
+    db.aulas.push({id:uid(),alunaId,data,tipo:al.tipo,aparelhos,status:'presente'});
     save(); renderAll(); toast('✅ Aula registrada!'); openDetalhe(alunaId);
   }
-
   function excluirAluna(id) {
-    if (!confirm('Excluir esta aluna e todo o histórico dela?')) return;
-    db.alunas   = db.alunas.filter(a=>a.id!==id);
-    db.aulas    = db.aulas.filter(a=>a.alunaId!==id);
+    if(!confirm('Excluir esta aluna e todo o histórico dela?'))return;
+    db.alunas    = db.alunas.filter(a=>a.id!==id);
+    db.aulas     = db.aulas.filter(a=>a.alunaId!==id);
     db.presencas = db.presencas.filter(p=>p.alunaId!==id);
     save(); renderAll(); closeModal('modalDetalhe'); toast('🗑️ Aluna removida');
   }
-
   function excluirAula(id, alunaId) {
-    db.aulas = db.aulas.filter(a=>a.id!==id);
-    save(); renderAll(); toast('🗑️ Aula removida');
-    if (alunaId) openDetalhe(alunaId);
+    db.aulas=db.aulas.filter(a=>a.id!==id); save(); renderAll(); toast('🗑️ Aula removida');
+    if(alunaId) openDetalhe(alunaId);
   }
 
   // ─── PAGAMENTO ────────────────────────────────────────────────────────────
   function renderPagamento() {
     const de  = document.getElementById('payDe')?.value;
     const ate = document.getElementById('payAte')?.value;
-    if (!de||!ate) return;
+    const stFilt = document.getElementById('payStudioFilter')?.value || '';
+    if(!de||!ate) return;
     const v    = vals();
     const allP = getAllPresentes();
-    const auls = allP.filter(a=>a.data>=de&&a.data<=ate);
+    let auls = allP.filter(a=>a.data>=de&&a.data<=ate);
 
-    // Separate regular vs convenio
-    const regularAuls = auls.filter(a => {
-      const al = db.alunas.find(x=>x.id===a.alunaId);
-      return !al || !al.convenio || al.convenio === 'regular';
-    });
-    const tpAuls  = auls.filter(a => db.alunas.find(x=>x.id===a.alunaId)?.convenio==='totalpass');
-    const whAuls  = auls.filter(a => db.alunas.find(x=>x.id===a.alunaId)?.convenio==='wellhub');
+    // Studio filter: only presencas linked to slots of this studio
+    if (stFilt) {
+      const slotIds = db.grade.filter(s=>s.studioId===stFilt).map(s=>s.id);
+      auls = auls.filter(a => a.source==='presenca' ? slotIds.includes(a.slotId) : false);
+    }
 
-    const res = {Individual:0,Dupla:0,Trio:0,Grupo:0};
+    const regularAuls = auls.filter(a=>{ const al=db.alunas.find(x=>x.id===a.alunaId); return !al||!al.convenio||al.convenio==='regular'; });
+    const tpAuls  = auls.filter(a=>db.alunas.find(x=>x.id===a.alunaId)?.convenio==='totalpass');
+    const whAuls  = auls.filter(a=>db.alunas.find(x=>x.id===a.alunaId)?.convenio==='wellhub');
+    const res={Individual:0,Dupla:0,Trio:0,Grupo:0};
     regularAuls.forEach(a=>{if(res[a.tipo]!==undefined)res[a.tipo]++;});
-    const total = Object.entries(res).reduce((s,[t,q])=>s+q*(v[t]||0),0);
-
-    const porAluna = {};
-    regularAuls.forEach(a=>{
-      if(!porAluna[a.alunaId])porAluna[a.alunaId]={qt:0,val:0};
-      porAluna[a.alunaId].qt++; porAluna[a.alunaId].val+=v[a.tipo]||0;
-    });
+    const total=Object.entries(res).reduce((s,[t,q])=>s+q*(v[t]||0),0);
+    const porAluna={};
+    regularAuls.forEach(a=>{ if(!porAluna[a.alunaId])porAluna[a.alunaId]={qt:0,val:0}; porAluna[a.alunaId].qt++; porAluna[a.alunaId].val+=v[a.tipo]||0; });
+    const stLabel = stFilt ? ` · ${studioName(stFilt)}` : '';
 
     document.getElementById('payResult').innerHTML = `
       <div class="card">
-        <div class="card-title" style="margin-bottom:12px">📊 Receita Regular (${fmt(de)} – ${fmt(ate)})</div>
+        <div class="card-title" style="margin-bottom:12px">📊 Receita Regular (${fmt(de)} – ${fmt(ate)})${stLabel}</div>
         ${Object.entries(res).filter(([,q])=>q>0).map(([t,q])=>`
           <div class="pay-row"><span>${t}</span><span>${q} aulas · R$ ${(q*(v[t]||0)).toFixed(2)}</span></div>`).join('')}
         <div class="pay-row" style="border-top:2px solid var(--border);margin-top:8px;padding-top:12px">
@@ -1089,22 +1263,21 @@
           <span class="pay-total">R$ ${total.toFixed(2)}</span>
         </div>
       </div>
-      ${tpAuls.length || whAuls.length ? `
+      ${tpAuls.length||whAuls.length?`
       <div class="card">
         <div class="card-title" style="margin-bottom:12px">🏢 Aulas por Convênio</div>
-        ${tpAuls.length ? `<div class="pay-row"><span>🔵 TotalPass</span><span class="badge badge-blue">${tpAuls.length} aulas</span></div>`:''}
-        ${whAuls.length ? `<div class="pay-row"><span>🟢 Wellhub</span><span class="badge badge-green">${whAuls.length} aulas</span></div>`:''}
+        ${tpAuls.length?`<div class="pay-row"><span>🔵 TotalPass</span><span class="badge badge-blue">${tpAuls.length} aulas</span></div>`:''}
+        ${whAuls.length?`<div class="pay-row"><span>🟢 Wellhub</span><span class="badge badge-green">${whAuls.length} aulas</span></div>`:''}
         <div style="font-size:.78rem;color:var(--text-muted);margin-top:8px;line-height:1.5">Faturamento via operadora — não incluso no total acima.</div>
-      </div>` : ''}
+      </div>`:''}
       <div class="card">
         <div class="card-title" style="margin-bottom:12px">👩 Detalhamento por Aluna (Regular)</div>
         ${Object.keys(porAluna).length
           ? Object.entries(porAluna).sort((a,b)=>b[1].val-a[1].val).map(([aid,d])=>{
-              const al = db.alunas.find(a=>a.id===aid);
+              const al=db.alunas.find(a=>a.id===aid);
               return `<div class="pay-row"><span>${al?al.nome:'—'}</span><span>${d.qt} aulas · <strong>R$ ${d.val.toFixed(2)}</strong></span></div>`;
             }).join('')
-          : '<div class="empty">Nenhuma aula regular no período</div>'
-        }
+          :'<div class="empty">Nenhuma aula regular no período</div>'}
       </div>`;
   }
 
@@ -1112,7 +1285,7 @@
   function renderRelatorio() {
     const de  = document.getElementById('relDe')?.value;
     const ate = document.getElementById('relAte')?.value;
-    if (!de||!ate) return;
+    if(!de||!ate) return;
     const filtAluna   = document.getElementById('relAluna')?.value   || '';
     const filtPlano   = document.getElementById('relPlano')?.value   || '';
     const filtHorario = document.getElementById('relHorario')?.value || '';
@@ -1123,88 +1296,66 @@
     const cur = sel.value;
     sel.innerHTML = '<option value="">Todas</option>' + db.alunas.map(a=>`<option value="${a.id}"${a.id===cur?' selected':''}>${a.nome}</option>`).join('');
 
-    // Rebuild horário select (distinct slot times from grade)
+    // Rebuild horário select
     const horSel = document.getElementById('relHorario');
     const curHor = horSel.value;
-    const uniqueSlots = [...new Map(db.grade.map(s=>[s.hora + (s.studio?'|'+s.studio:''), s])).values()]
+    const uniqueSlots = [...new Map(db.grade.map(s=>[s.hora+(s.studioId?'|'+s.studioId:''),s])).values()]
       .sort((a,b)=>a.hora.localeCompare(b.hora));
     horSel.innerHTML = '<option value="">Todos os Horários</option>' +
       uniqueSlots.map(s=>{
-        const label = s.hora + (s.studio ? ` · ${s.studio}` : '');
-        const val   = s.id;
-        return `<option value="${val}"${val===curHor?' selected':''}>${label}</option>`;
+        const stNm  = s.studioId ? ` · ${studioName(s.studioId)}` : '';
+        return `<option value="${s.id}"${s.id===curHor?' selected':''}>${s.hora}${stNm}</option>`;
       }).join('');
 
     // Rebuild studio select
     const studioSel = document.getElementById('relStudio');
     const curStudio = studioSel.value;
-    const allStudios = [...new Set(db.grade.map(s=>s.studio).filter(Boolean))];
     studioSel.innerHTML = '<option value="">Todos os Estúdios</option>' +
-      allStudios.map(s=>`<option value="${s}"${s===curStudio?' selected':''}>${s}</option>`).join('');
+      db.studios.map(s=>`<option value="${s.id}"${s.id===curStudio?' selected':''}>${s.nome}</option>`).join('');
 
     const allP = getAllPresentes();
     let auls = allP.filter(a=>a.data>=de&&a.data<=ate);
     if (filtAluna) auls = auls.filter(a=>a.alunaId===filtAluna);
-    if (filtPlano) {
-      auls = auls.filter(a => {
-        const al = db.alunas.find(x=>x.id===a.alunaId);
-        const conv = al?.convenio || 'regular';
-        return conv === filtPlano;
-      });
-    }
+    if (filtPlano) auls = auls.filter(a=>{ const al=db.alunas.find(x=>x.id===a.alunaId); return (al?.convenio||'regular')===filtPlano; });
     if (filtHorario) {
-      // Filter by slotId (from presencas) or matching hora (from old aulas)
       const slot = db.grade.find(s=>s.id===filtHorario);
-      if (slot) {
-        auls = auls.filter(a => {
-          if (a.source === 'presenca') return a.slotId === filtHorario;
-          // For old aulas: we can't filter by slot, so exclude them when a slot filter is active
-          return false;
-        });
-      }
+      if (slot) auls = auls.filter(a=>a.source==='presenca' && a.slotId===filtHorario);
     }
     if (filtStudio) {
-      // Filter presencas whose slot belongs to the selected studio
-      const slotIds = db.grade.filter(s=>s.studio===filtStudio).map(s=>s.id);
-      auls = auls.filter(a => {
-        if (a.source === 'presenca') return slotIds.includes(a.slotId);
-        return false; // old aulas have no studio info
-      });
+      const slotIds = db.grade.filter(s=>s.studioId===filtStudio).map(s=>s.id);
+      auls = auls.filter(a=>a.source==='presenca' ? slotIds.includes(a.slotId) : false);
     }
-
     auls.sort((a,b)=>b.data.localeCompare(a.data)||a.alunaId.localeCompare(b.alunaId));
 
-    const byDate = {};
+    const byDate={};
     auls.forEach(a=>{ if(!byDate[a.data])byDate[a.data]=[]; byDate[a.data].push(a); });
 
     const el = document.getElementById('relResult');
     if (!auls.length) { el.innerHTML='<div class="empty"><span class="empty-icon">📋</span>Nenhuma aula no período</div>'; return; }
 
-    el.innerHTML = Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0])).map(([data, aulasData])=>`
+    el.innerHTML = Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0])).map(([data,aulasData])=>`
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div class="card-title">📅 ${fmt(data)}</div>
           <span class="badge badge-ok">${aulasData.length} aula${aulasData.length>1?'s':''}</span>
         </div>
         ${aulasData.map(a=>{
-          const al = db.alunas.find(x=>x.id===a.alunaId);
+          const al   = db.alunas.find(x=>x.id===a.alunaId);
           const conv = al?.convenio;
-          const badge = conv==='totalpass'?'<span class="plan-badge plan-totalpass">TotalPass</span>'
-                      : conv==='wellhub'?'<span class="plan-badge plan-wellhub">Wellhub</span>':'';
-          // Get slot info for studio display
+          const badge= conv==='totalpass'?'<span class="plan-badge plan-totalpass">TotalPass</span>'
+                     : conv==='wellhub'  ?'<span class="plan-badge plan-wellhub">Wellhub</span>':'';
           const slot = a.slotId ? db.grade.find(s=>s.id===a.slotId) : null;
-          const studioLine = slot?.studio ? `<div style="font-size:.75rem;color:var(--primary);margin-top:3px">🏢 ${slot.studio} · ⏰ ${slot.hora}</div>` :
-                             slot?.hora   ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">⏰ ${slot.hora}</div>` : '';
-          // Aparelho from presenca
-          const aparelho = a.aparelho || '';
+          const st   = slot?.studioId ? studioById(slot.studioId) : null;
+          const stLine = st ? `<div style="font-size:.75rem;font-weight:700;color:${st.cor};margin-top:3px">🏢 ${st.nome} · ⏰ ${slot.hora}</div>`
+                           : slot?.hora ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">⏰ ${slot.hora}</div>` : '';
           return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:700;font-size:.95rem">👩 ${al?al.nome:'—'}${badge}</span>
               <span class="log-type">${a.tipo}</span>
             </div>
-            ${studioLine}
-            ${aparelho?`<div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">🏋️ ${aparelho}</div>`:
-              `<div style="font-size:.78rem;color:#c4b5d4;margin-top:4px;font-style:italic">Sem aparelho registrado</div>`}
+            ${stLine}
+            ${a.aparelho?`<div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">🏋️ ${a.aparelho}</div>`
+              :`<div style="font-size:.78rem;color:#c4b5d4;margin-top:4px;font-style:italic">Sem aparelho registrado</div>`}
           </div>`;
         }).join('')}
       </div>`).join('');
@@ -1212,7 +1363,7 @@
 
   function initRelatorio() {
     const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth();
+    const y=now.getFullYear(), m=now.getMonth();
     document.getElementById('relDe').value  = new Date(y,m,1).toISOString().slice(0,10);
     document.getElementById('relAte').value = now.toISOString().slice(0,10);
     renderRelatorio();
@@ -1220,265 +1371,239 @@
 
   // ─── CONFIG ───────────────────────────────────────────────────────────────
   function salvarConfig() {
-    db.config.nome   = document.getElementById('cfgNome').value;
-    db.config.studio = document.getElementById('cfgStudio').value;
-    db.config.studios = document.getElementById('cfgStudios').value
-      .split('\n').map(s=>s.trim()).filter(Boolean);
-    document.getElementById('navStudio').textContent = db.config.studio;
+    db.config.nome = document.getElementById('cfgNome').value;
     save();
   }
 
   function exportar() {
-    const blob = new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'pilates_backup_'+new Date().toISOString().slice(0,10)+'.json';
-    a.click(); toast('📤 Backup exportado!');
+    const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='pilates_backup_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+    toast('📤 Backup exportado!');
   }
-
   function importar(input) {
-    const file = input.files[0]; if(!file)return;
-    const r = new FileReader();
-    r.onload = e => {
+    const file=input.files[0]; if(!file)return;
+    const r=new FileReader();
+    r.onload=e=>{
       try {
-        const imported = JSON.parse(e.target.result);
-        // Merge safely — preserve existing, add new
-        if (imported.alunas)   db.alunas   = imported.alunas;
-        if (imported.aulas)    db.aulas    = imported.aulas;
-        if (imported.grade)    db.grade    = imported.grade;
-        if (imported.presencas) db.presencas = imported.presencas;
-        if (imported.config)   db.config   = imported.config;
-        // Re-migrate
-        if (!db.grade) db.grade = [];
-        if (!db.presencas) db.presencas = [];
-        db.aulas.forEach(a=>{ if(!a.status) a.status='presente'; });
+        const imp=JSON.parse(e.target.result);
+        if(imp.alunas)    db.alunas    = imp.alunas;
+        if(imp.aulas)     db.aulas     = imp.aulas;
+        if(imp.grade)     db.grade     = imp.grade;
+        if(imp.presencas) db.presencas = imp.presencas;
+        if(imp.studios)   db.studios   = imp.studios;
+        if(imp.config)    db.config    = imp.config;
+        // run migrations again
+        if(!db.grade)    db.grade=[];
+        if(!db.presencas)db.presencas=[];
+        if(!db.studios)  db.studios=[];
+        db.aulas.forEach(a=>{if(!a.status)a.status='presente';});
+        db.grade.forEach(slot=>{if(!('studioId' in slot))slot.studioId='';});
         save(); renderAll();
-        if(db.config.nome)   document.getElementById('cfgNome').value   = db.config.nome;
-        if(db.config.studio) document.getElementById('cfgStudio').value = db.config.studio;
+        if(db.config.nome) document.getElementById('cfgNome').value=db.config.nome;
+        updateNavStudio();
         toast('✅ Dados importados com sucesso!');
       } catch { toast('❌ Arquivo inválido'); }
     };
     r.readAsText(file);
   }
-
   function limpar() {
     if(!confirm('Apagar TODOS os dados? Esta ação não pode ser desfeita.'))return;
-    db={alunas:[],aulas:[],grade:[],presencas:[],config:{}}; save(); renderAll(); toast('🗑️ Dados apagados');
+    db={alunas:[],aulas:[],grade:[],presencas:[],studios:[],config:{}}; save(); renderAll(); toast('🗑️ Dados apagados');
   }
 
-  // ─── EXPORT PDF ───────────────────────────────────────────────────────────
+  // ─── EXPORT PDF — AULAS ───────────────────────────────────────────────────
   function exportarPDF() {
     const de  = document.getElementById('relDe')?.value;
     const ate = document.getElementById('relAte')?.value;
-    if (!de||!ate) { toast('⚠️ Selecione o período'); return; }
-    const filtAluna = document.getElementById('relAluna')?.value || '';
-    const filtPlano = document.getElementById('relPlano')?.value || '';
+    if(!de||!ate){ toast('⚠️ Selecione o período'); return; }
+    const filtAluna  = document.getElementById('relAluna')?.value  || '';
+    const filtPlano  = document.getElementById('relPlano')?.value  || '';
+    const filtStudio = document.getElementById('relStudio')?.value || '';
+
     const allP = getAllPresentes();
     let auls = allP.filter(a=>a.data>=de&&a.data<=ate);
-    if (filtAluna) auls = auls.filter(a=>a.alunaId===filtAluna);
-    if (filtPlano) {
-      auls = auls.filter(a => {
-        const al = db.alunas.find(x=>x.id===a.alunaId);
-        const conv = al?.convenio || 'regular';
-        return conv === filtPlano;
-      });
+    if (filtAluna)  auls = auls.filter(a=>a.alunaId===filtAluna);
+    if (filtPlano)  auls = auls.filter(a=>{ const al=db.alunas.find(x=>x.id===a.alunaId); return (al?.convenio||'regular')===filtPlano; });
+    if (filtStudio) {
+      const slotIds=db.grade.filter(s=>s.studioId===filtStudio).map(s=>s.id);
+      auls=auls.filter(a=>a.source==='presenca'?slotIds.includes(a.slotId):false);
     }
     auls.sort((a,b)=>b.data.localeCompare(a.data));
-    const byDate = {};
+
+    const byDate={};
     auls.forEach(a=>{ if(!byDate[a.data])byDate[a.data]=[]; byDate[a.data].push(a); });
 
     const tpCount = auls.filter(a=>db.alunas.find(x=>x.id===a.alunaId)?.convenio==='totalpass').length;
     const whCount = auls.filter(a=>db.alunas.find(x=>x.id===a.alunaId)?.convenio==='wellhub').length;
 
-    const studio = db.config.studio || 'Pilates Control';
-    const prof   = db.config.nome   || '';
-    const today  = new Date().toLocaleDateString('pt-BR');
+    const studioObj  = filtStudio ? studioById(filtStudio) : null;
+    const studioLabel = studioObj ? studioObj.nome : (db.studios.length===1 ? db.studios[0].nome : 'Pilates Control');
+    const prof        = db.config.nome || '';
+    const today       = new Date().toLocaleDateString('pt-BR');
+    const planoLabel  = filtPlano==='totalpass'?'· Apenas TotalPass':filtPlano==='wellhub'?'· Apenas Wellhub':filtPlano==='regular'?'· Apenas Regular':'';
+    const stLabel     = studioObj ? `· ${studioObj.nome}` : '';
+    const headerColor = studioObj ? studioObj.cor : '#a855f7';
+    const darkColor   = studioObj ? studioObj.cor : '#7e22ce';
 
-    const planoFiltroLabel = filtPlano==='totalpass'?'· Apenas TotalPass':filtPlano==='wellhub'?'· Apenas Wellhub':filtPlano==='regular'?'· Apenas Regular':'';
-
-    const linhasPorData = Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0])).map(([data, aulasData])=>{
+    const linhas = Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0])).map(([data,aulasData])=>{
       const rows = aulasData.map(a=>{
         const al   = db.alunas.find(x=>x.id===a.alunaId);
-        const conv = al?.convenio || 'regular';
+        const conv = al?.convenio||'regular';
         const convLabel = conv==='totalpass'?'TotalPass':conv==='wellhub'?'Wellhub':'—';
+        const slot = a.slotId ? db.grade.find(s=>s.id===a.slotId) : null;
+        const stNm = slot?.studioId ? studioName(slot.studioId) : '';
         return `<tr>
-          <td></td>
-          <td>${al?al.nome:'—'}</td>
-          <td>${a.tipo}</td>
-          <td>${conv!=='regular'?convLabel:(a.aparelhos||'<span style="color:#aaa;font-style:italic">—</span>')}</td>
+          <td></td><td>${al?al.nome:'—'}</td><td>${a.tipo}</td>
+          <td>${stNm}</td>
+          <td>${conv!=='regular'?convLabel:(a.aparelho||a.aparelhos||'<span style="color:#aaa;font-style:italic">—</span>')}</td>
         </tr>`;
       }).join('');
-      return `<tr class="date-row">
-        <td colspan="4">📅 ${fmt(data)} <span style="font-size:11px;font-weight:400;color:#ccc">(${aulasData.length} aula${aulasData.length>1?'s':''})</span></td>
-      </tr>${rows}`;
+      return `<tr class="date-row"><td colspan="5">📅 ${fmt(data)} <span style="font-size:11px;font-weight:400;color:#ccc">(${aulasData.length} aula${aulasData.length>1?'s':''})</span></td></tr>${rows}`;
     }).join('');
 
-    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-    <title>Relatório – ${studio}</title>
+    const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <title>Relatório – ${studioLabel}</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-      * { box-sizing:border-box; margin:0; padding:0; }
-      body { font-family: 'Inter', sans-serif; color: #1e1b2e; background:#fff; padding:32px; }
-      .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; border-bottom:3px solid #a855f7; padding-bottom:18px; }
-      .studio-name { font-size:22px; font-weight:800; color:#7e22ce; }
-      .prof { font-size:13px; color:#6b7280; margin-top:4px; }
-      .periodo { text-align:right; font-size:12px; color:#6b7280; line-height:1.8; }
-      .periodo strong { color:#a855f7; font-size:14px; display:block; }
-      table { width:100%; border-collapse:collapse; font-size:13px; }
-      th { background:#f3e8ff; color:#7e22ce; font-weight:700; padding:9px 12px; text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.5px; }
-      td { padding:8px 12px; border-bottom:1px solid #f0e6ff; vertical-align:middle; }
-      tr.date-row td { background:#7e22ce; color:#fff; font-weight:700; font-size:13px; padding:8px 12px; }
-      .summary { margin-top:28px; display:flex; gap:16px; flex-wrap:wrap; }
-      .sum-card { flex:1; min-width:100px; border:1.5px solid #e9d5ff; border-radius:12px; padding:14px; text-align:center; }
-      .sum-val { font-size:26px; font-weight:800; color:#a855f7; }
-      .sum-lbl { font-size:11px; color:#6b7280; font-weight:600; margin-top:3px; }
-      .sum-card.tp { border-color:#bfdbfe; } .sum-card.tp .sum-val { color:#1e40af; }
-      .sum-card.wh { border-color:#bbf7d0; } .sum-card.wh .sum-val { color:#14532d; }
-      .footer { margin-top:28px; text-align:center; font-size:11px; color:#aaa; }
-      @media print { body { padding:16px; } }
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Inter',sans-serif;color:#1e1b2e;background:#fff;padding:32px}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:3px solid ${headerColor};padding-bottom:18px}
+      .studio-name{font-size:22px;font-weight:800;color:${darkColor}}
+      .prof{font-size:13px;color:#6b7280;margin-top:4px}
+      .periodo{text-align:right;font-size:12px;color:#6b7280;line-height:1.8}
+      .periodo strong{color:${headerColor};font-size:14px;display:block}
+      table{width:100%;border-collapse:collapse;font-size:13px}
+      th{background:#f3e8ff;color:${darkColor};font-weight:700;padding:9px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+      td{padding:8px 12px;border-bottom:1px solid #f0e6ff;vertical-align:middle}
+      tr.date-row td{background:${darkColor};color:#fff;font-weight:700;font-size:13px;padding:8px 12px}
+      .summary{margin-top:28px;display:flex;gap:16px;flex-wrap:wrap}
+      .sum-card{flex:1;min-width:100px;border:1.5px solid #e9d5ff;border-radius:12px;padding:14px;text-align:center}
+      .sum-val{font-size:26px;font-weight:800;color:${headerColor}}
+      .sum-lbl{font-size:11px;color:#6b7280;font-weight:600;margin-top:3px}
+      .footer{margin-top:28px;text-align:center;font-size:11px;color:#aaa}
+      @media print{body{padding:16px}}
     </style></head><body>
     <div class="header">
       <div>
-        <div class="studio-name">🧘 ${studio}</div>
+        <div class="studio-name">🧘 ${studioLabel}</div>
         ${prof?`<div class="prof">Professora: ${prof}</div>`:''}
       </div>
       <div class="periodo">
-        <strong>Relatório de Aulas ${planoFiltroLabel}</strong>
-        ${fmt(de)} até ${fmt(ate)}<br>
-        Gerado em ${today}
+        <strong>Relatório de Aulas ${planoLabel} ${stLabel}</strong>
+        ${fmt(de)} até ${fmt(ate)}<br>Gerado em ${today}
       </div>
     </div>
     <div class="summary">
       <div class="sum-card"><div class="sum-val">${auls.length}</div><div class="sum-lbl">Total de Aulas</div></div>
       <div class="sum-card"><div class="sum-val">${Object.keys(byDate).length}</div><div class="sum-lbl">Dias com Aula</div></div>
       <div class="sum-card"><div class="sum-val">${[...new Set(auls.map(a=>a.alunaId))].length}</div><div class="sum-lbl">Pacientes</div></div>
-      ${tpCount?`<div class="sum-card tp"><div class="sum-val">${tpCount}</div><div class="sum-lbl">TotalPass</div></div>`:''}
-      ${whCount?`<div class="sum-card wh"><div class="sum-val">${whCount}</div><div class="sum-lbl">Wellhub</div></div>`:''}
-    </div>
-    <br>
+      ${tpCount?`<div class="sum-card" style="border-color:#bfdbfe"><div class="sum-val" style="color:#1e40af">${tpCount}</div><div class="sum-lbl">TotalPass</div></div>`:''}
+      ${whCount?`<div class="sum-card" style="border-color:#bbf7d0"><div class="sum-val" style="color:#14532d">${whCount}</div><div class="sum-lbl">Wellhub</div></div>`:''}
+    </div><br>
     <table>
-      <thead><tr><th style="width:120px">Data</th><th>Paciente</th><th style="width:100px">Tipo</th><th>Aparelhos / Convênio</th></tr></thead>
-      <tbody>${linhasPorData||'<tr><td colspan="4" style="text-align:center;padding:24px;color:#aaa">Nenhuma aula no período</td></tr>'}</tbody>
+      <thead><tr><th style="width:100px">Data</th><th>Paciente</th><th style="width:90px">Tipo</th><th style="width:110px">Estúdio</th><th>Aparelhos / Convênio</th></tr></thead>
+      <tbody>${linhas||'<tr><td colspan="5" style="text-align:center;padding:24px;color:#aaa">Nenhuma aula no período</td></tr>'}</tbody>
     </table>
-    <div class="footer">Pilates Control v2.0 · Relatório gerado automaticamente</div>
-    <script>window.onload=()=>{ window.print(); }<\/script>
+    <div class="footer">Pilates Control v3.0 · Relatório gerado automaticamente</div>
+    <script>window.onload=()=>{window.print();}<\/script>
     </body></html>`;
 
-    const win = window.open('','_blank');
-    if (!win) { toast('⚠️ Permita pop-ups para exportar o PDF'); return; }
-    win.document.write(html);
-    win.document.close();
+    const win=window.open('','_blank');
+    if(!win){toast('⚠️ Permita pop-ups para exportar o PDF');return;}
+    win.document.write(html); win.document.close();
     toast('📄 Abrindo relatório para impressão...');
   }
 
-  // ─── EXPORTAR GRADE HORÁRIA (tabela estilo folha) ─────────────────────────
+  // ─── EXPORT PDF — GRADE ───────────────────────────────────────────────────
   function exportarGradePDF() {
-    const studio = db.config.studio || 'Pilates Control';
-    const prof   = db.config.nome   || '';
-    const today  = new Date().toLocaleDateString('pt-BR');
+    const filtStudio = document.getElementById('relStudio')?.value || '';
+    const studioObj  = filtStudio ? studioById(filtStudio) : null;
+    const studioLabel= studioObj ? studioObj.nome : (db.studios.length===1?db.studios[0].nome:'Pilates Control');
+    const prof       = db.config.nome||'';
+    const today      = new Date().toLocaleDateString('pt-BR');
+    const headerColor= studioObj ? studioObj.cor : '#a855f7';
+    const darkColor  = studioObj ? studioObj.cor : '#7e22ce';
 
-    const HORARIOS = [
-      '07:00','08:00','09:00','10:00','11:00',
-      '13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'
-    ];
-    const DIAS_LABEL = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-    const DIAS_NUM   = [1,2,3,4,5,6];
+    const HORARIOS=['07:00','08:00','09:00','10:00','11:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+    const DIAS_NUM=[1,2,3,4,5,6];
+    const DIAS_LABEL=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 
-    // Build lookup: dia -> hora -> [nomes]
-    const lookup = {};
-    DIAS_NUM.forEach(d => {
-      lookup[d] = {};
-      HORARIOS.forEach(h => { lookup[d][h] = []; });
-    });
+    let gradeSlots = filtStudio ? db.grade.filter(g=>g.studioId===filtStudio) : db.grade;
 
-    db.grade.forEach(slot => {
-      const h = slot.hora.slice(0,5); // normalize to HH:MM
-      if (!lookup[slot.dia]) return;
-      if (!lookup[slot.dia][h]) lookup[slot.dia][h] = [];
-      (slot.alunaIds||[]).forEach(aid => {
-        const al = db.alunas.find(a=>a.id===aid);
-        if (al) lookup[slot.dia][h].push(al.nome);
+    const lookup={};
+    DIAS_NUM.forEach(d=>{ lookup[d]={}; HORARIOS.forEach(h=>{lookup[d][h]=[];}); });
+    gradeSlots.forEach(slot=>{
+      const h=slot.hora.slice(0,5);
+      if(!lookup[slot.dia]||!lookup[slot.dia][h]) return;
+      (slot.alunaIds||[]).forEach(aid=>{
+        const al=db.alunas.find(a=>a.id===aid);
+        if(al) lookup[slot.dia][h].push(al.nome);
       });
     });
 
-    // Only include rows that have at least one aluna in any day
-    const activeHorarios = HORARIOS.filter(h =>
-      DIAS_NUM.some(d => lookup[d][h] && lookup[d][h].length > 0)
-    );
+    const activeHorarios=HORARIOS.filter(h=>DIAS_NUM.some(d=>lookup[d][h]&&lookup[d][h].length>0));
+    if(!activeHorarios.length){toast('⚠️ Nenhum horário cadastrado na grade');return;}
 
-    if (!activeHorarios.length) {
-      toast('⚠️ Nenhum horário cadastrado na grade'); return;
-    }
-
-    const headerCells = DIAS_LABEL.map(d =>
-      `<th>${d}</th>`
-    ).join('');
-
-    const rows = activeHorarios.map(h => {
-      const cells = DIAS_NUM.map(d => {
-        const nomes = lookup[d][h];
-        if (!nomes || !nomes.length) return `<td class="empty-cell"></td>`;
-        return `<td>${nomes.map(n => `<span class="aluna-nome">${n}</span>`).join('')}</td>`;
+    const headerCells=DIAS_LABEL.map(d=>`<th>${d}</th>`).join('');
+    const rows=activeHorarios.map(h=>{
+      const cells=DIAS_NUM.map(d=>{
+        const nomes=lookup[d][h];
+        if(!nomes||!nomes.length)return`<td class="empty-cell"></td>`;
+        return`<td>${nomes.map(n=>`<span class="aluna-nome">${n}</span>`).join('')}</td>`;
       }).join('');
-      const endH = String(parseInt(h)+1).padStart(2,'0');
-      return `<tr><td class="hora-cell">${h} – ${endH}:50</td>${cells}</tr>`;
+      const endH=String(parseInt(h)+1).padStart(2,'0');
+      return`<tr><td class="hora-cell">${h} – ${endH}:50</td>${cells}</tr>`;
     }).join('');
 
-    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-    <title>Grade Horária – ${studio}</title>
+    const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <title>Grade Horária – ${studioLabel}</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-      * { box-sizing:border-box; margin:0; padding:0; }
-      body { font-family:'Inter',sans-serif; color:#1e1b2e; padding:20px; background:#fff; }
-      .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:18px; border-bottom:3px solid #a855f7; padding-bottom:12px; }
-      .studio  { font-size:20px; font-weight:800; color:#7e22ce; }
-      .sub     { font-size:12px; color:#6b7280; margin-top:3px; }
-      .meta    { font-size:11px; color:#9ca3af; text-align:right; line-height:1.8; }
-      table    { width:100%; border-collapse:collapse; font-size:11.5px; table-layout:fixed; }
-      th       { background:#7e22ce; color:#fff; padding:8px 6px; text-align:center; font-weight:700; font-size:12px; }
-      th:first-child { width:90px; background:#5b21b6; }
-      td       { border:1px solid #e9d5ff; padding:6px 7px; vertical-align:top; min-height:36px; }
-      td.hora-cell { background:#f3e8ff; font-weight:700; font-size:11px; color:#6b21a8; text-align:center; vertical-align:middle; white-space:nowrap; }
-      td.empty-cell { background:#fafafa; }
-      tr:hover td { background:#fdf4ff; }
-      tr:hover td.hora-cell { background:#ede9fe; }
-      .aluna-nome { display:block; padding:2px 0; font-size:11px; color:#1e1b2e; line-height:1.4; }
-      .aluna-nome:not(:last-child) { border-bottom:1px dotted #e9d5ff; margin-bottom:2px; padding-bottom:2px; }
-      .footer { margin-top:14px; text-align:center; font-size:10px; color:#d1d5db; }
-      @media print {
-        body { padding:10px; }
-        @page { size: landscape; margin: 10mm; }
-      }
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Inter',sans-serif;color:#1e1b2e;padding:20px;background:#fff}
+      .header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;border-bottom:3px solid ${headerColor};padding-bottom:12px}
+      .studio{font-size:20px;font-weight:800;color:${darkColor}}
+      .sub{font-size:12px;color:#6b7280;margin-top:3px}
+      .meta{font-size:11px;color:#9ca3af;text-align:right;line-height:1.8}
+      table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed}
+      th{background:${darkColor};color:#fff;padding:8px 6px;text-align:center;font-weight:700;font-size:12px}
+      th:first-child{width:90px;background:${headerColor}cc}
+      td{border:1px solid #e9d5ff;padding:6px 7px;vertical-align:top;min-height:36px}
+      td.hora-cell{background:#f3e8ff;font-weight:700;font-size:11px;color:${darkColor};text-align:center;vertical-align:middle;white-space:nowrap}
+      td.empty-cell{background:#fafafa}
+      .aluna-nome{display:block;padding:2px 0;font-size:11px;color:#1e1b2e;line-height:1.4}
+      .aluna-nome:not(:last-child){border-bottom:1px dotted #e9d5ff;margin-bottom:2px;padding-bottom:2px}
+      .footer{margin-top:14px;text-align:center;font-size:10px;color:#d1d5db}
+      @media print{body{padding:10px}@page{size:landscape;margin:10mm}}
     </style></head><body>
     <div class="header">
       <div>
-        <div class="studio">🧘 ${studio}</div>
-        ${prof ? `<div class="sub">Professora: ${prof}</div>` : ''}
+        <div class="studio">🧘 ${studioLabel}</div>
+        ${prof?`<div class="sub">Professora: ${prof}</div>`:''}
+        ${studioObj?.endereco?`<div class="sub">📍 ${studioObj.endereco}</div>`:''}
       </div>
-      <div class="meta">Grade Horária<br>Gerado em ${today}</div>
+      <div class="meta">Grade Horária${filtStudio?` · ${studioObj.nome}`:''}<br>Gerado em ${today}</div>
     </div>
     <table>
       <thead><tr><th>Horário</th>${headerCells}</tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="footer">Pilates Control v2.0 · Grade gerada automaticamente</div>
-    <script>window.onload=()=>{ window.print(); }<\/script>
+    <div class="footer">Pilates Control v3.0 · Grade gerada automaticamente</div>
+    <script>window.onload=()=>{window.print();}<\/script>
     </body></html>`;
 
-    const win = window.open('','_blank');
-    if (!win) { toast('⚠️ Permita pop-ups para exportar'); return; }
-    win.document.write(html);
-    win.document.close();
+    const win=window.open('','_blank');
+    if(!win){toast('⚠️ Permita pop-ups para exportar');return;}
+    win.document.write(html); win.document.close();
     toast('🗓️ Abrindo grade para impressão...');
   }
-
 
   // ─── HELPERS ──────────────────────────────────────────────────────────────
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
   document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
-
   function toast(msg) {
-    const el = document.getElementById('toast');
+    const el=document.getElementById('toast');
     el.textContent=msg; el.style.opacity='1'; el.style.transform='translateX(-50%) translateY(0)';
     setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(-50%) translateY(30px)'; },2500);
   }
