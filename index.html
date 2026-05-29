@@ -301,7 +301,7 @@
   </div>
   <div class="card" style="text-align:center;color:var(--text-muted);font-size:.8rem;line-height:1.8">
     <div style="font-size:1.5rem;margin-bottom:4px">🧘</div>
-    <strong>Pilates Control v3.0</strong><br>
+    <strong>Pilates Control v3.1</strong><br>
     Para instalar no celular:<br>
     <em>Menu do Chrome → "Adicionar à tela inicial"</em>
   </div>
@@ -363,6 +363,11 @@
     </select>
     <label>Tipo de Aula Padrão</label>
     <select id="aTipo"><option>Individual</option><option>Dupla</option><option>Trio</option><option>Grupo</option></select>
+    
+    <!-- NOVO CAMPO: ESTÚDIO DA ALUNA -->
+    <label>Estúdio</label>
+    <select id="aStudio"><option value="">— Nenhum / Avulso —</option></select>
+
     <label>Plano / Convênio</label>
     <select id="aConvenio">
       <option value="regular">Regular (sem convênio)</option>
@@ -499,8 +504,6 @@
   db.aulas.forEach(a => { if (!a.status) a.status = 'presente'; });
 
   // ─── MIGRATION v2→v3: studios as entities ─────────────────────────────────
-  // Studios were previously stored as plain strings (config.studio + config.studios[]).
-  // Now they are first-class objects in db.studios[].
   if (!db.studios) {
     db.studios = [];
     const COLORS = ['#a855f7','#ec4899','#3b82f6','#10b981','#f59e0b','#ef4444','#6366f1','#14b8a6'];
@@ -512,12 +515,10 @@
     collected.forEach((name, i) => {
       db.studios.push({ id: uid(), nome: name, endereco: '', obs: '', cor: COLORS[i % COLORS.length] });
     });
-    // Patch grade slots: replace studio string → studioId
     db.grade.forEach(slot => {
       if (slot.studio && typeof slot.studio === 'string') {
         const found = db.studios.find(s => s.nome === slot.studio);
         slot.studioId = found ? found.id : '';
-        // keep slot.studio as legacy fallback — will be cleared on next save
       }
     });
   }
@@ -554,7 +555,6 @@
     return js === 0 ? 7 : js;
   }
 
-  // Returns studio object or null
   function studioById(id) { return db.studios.find(s => s.id === id) || null; }
   function studioName(id) { const s = studioById(id); return s ? s.nome : ''; }
   function studioCor(id)  { const s = studioById(id); return s ? s.cor  : '#a855f7'; }
@@ -641,29 +641,21 @@
       return html;
     };
 
-    // Presença filter
     const pSel = document.getElementById('presencaStudioFilter');
-    const pCur = pSel.value;
-    pSel.innerHTML = makeOpts(true, pCur);
+    if (pSel) pSel.innerHTML = makeOpts(true, pSel.value);
 
-    // Pagamento filter
     const pgSel = document.getElementById('payStudioFilter');
-    const pgCur = pgSel.value;
-    pgSel.innerHTML = makeOpts(true, pgCur);
+    if (pgSel) pgSel.innerHTML = makeOpts(true, pgSel.value);
 
-    // Grade modal
     const gSel = document.getElementById('gStudio');
-    if (gSel) {
-      const gCur = gSel.value;
-      gSel.innerHTML = makeOpts(false, gCur);
-    }
+    if (gSel) gSel.innerHTML = makeOpts(false, gSel.value);
 
-    // Relatório filter
     const rSel = document.getElementById('relStudio');
-    if (rSel) {
-      const rCur = rSel.value;
-      rSel.innerHTML = makeOpts(true, rCur);
-    }
+    if (rSel) rSel.innerHTML = makeOpts(true, rSel.value);
+
+    // Dropdown para o Cadastro da Aluna
+    const aSel = document.getElementById('aStudio');
+    if (aSel) aSel.innerHTML = '<option value="">— Nenhum / Avulso —</option>' + db.studios.map(s => `<option value="${s.id}"${s.id===aSel.value?' selected':''}>${s.nome}</option>`).join('');
   }
 
   // ─── MODAL ESTÚDIO ────────────────────────────────────────────────────────
@@ -671,7 +663,6 @@
     editStudioId = id || null;
     selectedStudioColor = id ? (studioById(id)?.cor || COLORS[0]) : COLORS[db.studios.length % COLORS.length];
 
-    // Build color picker
     const cp = document.getElementById('colorPicker');
     cp.innerHTML = COLORS.map(c => `
       <div onclick="pickColor('${c}')" id="cp_${c.replace('#','')}"
@@ -729,6 +720,8 @@
     if (!confirm(msg)) return;
     db.studios  = db.studios.filter(s => s.id !== id);
     db.grade.forEach(g => { if (g.studioId === id) g.studioId = ''; });
+    // Clear from alunas too
+    db.alunas.forEach(a => { if (a.studioId === id) a.studioId = ''; });
     save(); renderAll(); toast('🗑️ Estúdio removido'); updateNavStudio();
   }
 
@@ -745,7 +738,6 @@
       return a.data.startsWith(mes) && (!al || !al.convenio || al.convenio === 'regular');
     });
     const ganho = regularMes.reduce((s,a)=>s+(v[a.tipo]||0),0);
-    const totalFaltas = db.presencas.filter(p=>p.status==='falta'&&p.data.startsWith(mes)).length;
     document.getElementById('statsGrid').innerHTML = `
       <div class="stat-card"><div class="stat-value">${db.alunas.length}</div><div class="stat-label">Total de Alunas</div></div>
       <div class="stat-card"><div class="stat-value">${hoje}</div><div class="stat-label">Presenças Hoje</div></div>
@@ -770,9 +762,10 @@
       const conv = al?.convenio;
       const convBadge = conv==='totalpass'?'<span class="plan-badge plan-totalpass">TotalPass</span>'
                       : conv==='wellhub'  ?'<span class="plan-badge plan-wellhub">Wellhub</span>':'';
-      // Studio from presenca's slot
       const slot = a.slotId ? db.grade.find(s=>s.id===a.slotId) : null;
-      const studioTag = slot?.studioId ? `<span style="font-size:.74rem;color:${studioCor(slot.studioId)};font-weight:700;margin-left:4px">🏢 ${studioName(slot.studioId)}</span>` : '';
+      // Resgate visual do estúdio para mostrar no log
+      const stId = slot?.studioId || al?.studioId;
+      const studioTag = stId ? `<span style="font-size:.74rem;color:${studioCor(stId)};font-weight:700;margin-left:4px">🏢 ${studioName(stId)}</span>` : '';
       return `<div class="log-item" style="flex-direction:column;align-items:flex-start;gap:4px">
         <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
           <div>
@@ -793,7 +786,6 @@
     sel.innerHTML = '<option value="">Selecione...</option>' + db.alunas.map(a=>`<option value="${a.id}"${a.id===cur?' selected':''}>${a.nome}</option>`).join('');
   }
 
-  // ─── REGISTRAR AULA AVULSA ────────────────────────────────────────────────
   function registrarAula() {
     const alunaId   = document.getElementById('quickAluna').value;
     const data      = document.getElementById('quickData').value;
@@ -807,14 +799,12 @@
 
   // ─── GRADE HORÁRIA ────────────────────────────────────────────────────────
   function renderGrade() {
-    // Studio filter bar
     const sfEl = document.getElementById('gradeStudioFilter');
     sfEl.innerHTML = `<div class="sf-btn${activeGradeStudio===''?' active':''}" onclick="setGradeStudio('')">Todos</div>` +
       db.studios.map(s => `<div class="sf-btn${activeGradeStudio===s.id?' active':''}"
         style="${activeGradeStudio===s.id?`background:${s.cor};border-color:${s.cor};color:#fff`:''}"
         onclick="setGradeStudio('${s.id}')">${s.nome}</div>`).join('');
 
-    // Day tabs
     const tabsEl = document.getElementById('dayTabs');
     tabsEl.innerHTML = [1,2,3,4,5,6].map(d=>`
       <div class="day-tab${activeDayTab===d?' active':''}" onclick="setDayTab(${d})">${DIAS[d]}</div>`).join('');
@@ -865,10 +855,8 @@
 
   function openModalGrade(id) {
     gradeEditId = id || null;
-    // Rebuild studio select first
     renderStudioSelects();
 
-    // Build aluna checkboxes
     const checksEl = document.getElementById('gAlunasSel');
     checksEl.innerHTML = db.alunas.length
       ? db.alunas.map(a=>`
@@ -1098,9 +1086,13 @@
       const conv   = a.convenio;
       const convLabel  = conv==='totalpass'?'TotalPass': conv==='wellhub'?'Wellhub':`${a.plano}x/sem · ${a.tipo}`;
       const planClass  = conv==='totalpass'?'totalpass': conv==='wellhub'?'wellhub':'';
+      
+      const st = a.studioId ? studioById(a.studioId) : null;
+      const stTag = st ? `<span style="font-size:.65rem; color:${st.cor}; border: 1px solid ${st.cor}; border-radius: 8px; padding: 1px 6px; margin-left: 6px; font-weight:700; white-space:nowrap">${st.nome}</span>` : '';
+
       return `<div class="aluna-item" onclick="openDetalhe('${a.id}')">
         <div class="aluna-header">
-          <span class="aluna-name">${a.nome}</span>
+          <span class="aluna-name" style="display:flex;align-items:center">${a.nome} ${stTag}</span>
           <span class="aluna-plan ${planClass}">${convLabel}</span>
         </div>
         <div class="aluna-meta">
@@ -1116,12 +1108,14 @@
   // ─── MODAL NOVA/EDITAR ALUNA ──────────────────────────────────────────────
   function openModalAluna(id) {
     editId = id || null;
+    renderStudioSelects();
     if (id) {
       const a = db.alunas.find(x=>x.id===id);
       document.getElementById('aNome').value     = a.nome;
       document.getElementById('aTel').value      = a.tel||'';
       document.getElementById('aPlano').value    = a.plano;
       document.getElementById('aTipo').value     = a.tipo;
+      document.getElementById('aStudio').value   = a.studioId||'';
       document.getElementById('aConvenio').value = a.convenio||'regular';
       document.getElementById('aObs').value      = a.obs||'';
       document.getElementById('modalAlunaTitle').textContent = '✏️ Editar Aluna';
@@ -1129,6 +1123,7 @@
       ['aNome','aTel','aObs'].forEach(i=>document.getElementById(i).value='');
       document.getElementById('aPlano').value    = '2';
       document.getElementById('aTipo').value     = 'Individual';
+      document.getElementById('aStudio').value   = '';
       document.getElementById('aConvenio').value = 'regular';
       document.getElementById('modalAlunaTitle').textContent = '➕ Nova Aluna';
     }
@@ -1137,7 +1132,15 @@
   function salvarAluna() {
     const nome = document.getElementById('aNome').value.trim();
     if (!nome) { toast('⚠️ Informe o nome'); return; }
-    const data = { nome, tel: document.getElementById('aTel').value, plano: +document.getElementById('aPlano').value, tipo: document.getElementById('aTipo').value, convenio: document.getElementById('aConvenio').value||'regular', obs: document.getElementById('aObs').value };
+    const data = { 
+      nome, 
+      tel: document.getElementById('aTel').value, 
+      plano: +document.getElementById('aPlano').value, 
+      tipo: document.getElementById('aTipo').value, 
+      studioId: document.getElementById('aStudio').value,
+      convenio: document.getElementById('aConvenio').value||'regular', 
+      obs: document.getElementById('aObs').value 
+    };
     if (editId) { Object.assign(db.alunas.find(a=>a.id===editId), data); toast('✅ Aluna atualizada!'); }
     else { db.alunas.push({ id:uid(), ...data }); toast('✅ Aluna cadastrada!'); }
     save(); renderAll(); closeModal('modalAluna');
@@ -1155,10 +1158,13 @@
     const ganho  = isConv ? 0 : aMes.reduce((s,a)=>s+(v[a.tipo]||0),0);
     const convBadge = al.convenio==='totalpass'?'<span class="badge badge-blue">TotalPass</span>'
                     : al.convenio==='wellhub'  ?'<span class="badge badge-green">Wellhub</span>':'';
+    const st = al.studioId ? studioById(al.studioId) : null;
+    const stBadge = st ? `<span style="font-size:.75rem; color:${st.cor}; font-weight:700; margin-left:6px">🏢 ${st.nome}</span>` : '';
+    
     const faltasMes = db.presencas.filter(p=>p.alunaId===id&&p.status==='falta'&&p.data.startsWith(mes)).length;
     const recentPrecs = db.presencas.filter(p=>p.alunaId===id).sort((a,b)=>b.data.localeCompare(a.data)).slice(0,20);
     document.getElementById('detalheContent').innerHTML = `
-      <div class="modal-title">${al.nome} ${convBadge}</div>
+      <div class="modal-title">${al.nome} ${convBadge} ${stBadge}</div>
       ${al.tel?`<p style="font-size:.85rem;color:var(--text-muted);margin-bottom:8px">📞 ${al.tel}</p>`:''}
       ${al.obs?`<p style="font-size:.82rem;color:var(--text-muted);margin-bottom:12px">📝 ${al.obs}</p>`:''}
       <div class="stats-grid" style="margin-bottom:12px">
@@ -1220,6 +1226,7 @@
     db.alunas    = db.alunas.filter(a=>a.id!==id);
     db.aulas     = db.aulas.filter(a=>a.alunaId!==id);
     db.presencas = db.presencas.filter(p=>p.alunaId!==id);
+    db.grade.forEach(g=>{ g.alunaIds = g.alunaIds.filter(aid => aid !== id); });
     save(); renderAll(); closeModal('modalDetalhe'); toast('🗑️ Aluna removida');
   }
   function excluirAula(id, alunaId) {
@@ -1237,10 +1244,15 @@
     const allP = getAllPresentes();
     let auls = allP.filter(a=>a.data>=de&&a.data<=ate);
 
-    // Studio filter: only presencas linked to slots of this studio
+    // Regra de Resgate: Retorna a aula se o slot é do estúdio OU se a aluna é do estúdio
     if (stFilt) {
       const slotIds = db.grade.filter(s=>s.studioId===stFilt).map(s=>s.id);
-      auls = auls.filter(a => a.source==='presenca' ? slotIds.includes(a.slotId) : false);
+      auls = auls.filter(a => {
+        const bySlot = a.source === 'presenca' && slotIds.includes(a.slotId);
+        const aluna = db.alunas.find(x => x.id === a.alunaId);
+        const byAluna = aluna && aluna.studioId === stFilt;
+        return bySlot || byAluna;
+      });
     }
 
     const regularAuls = auls.filter(a=>{ const al=db.alunas.find(x=>x.id===a.alunaId); return !al||!al.convenio||al.convenio==='regular'; });
@@ -1291,12 +1303,10 @@
     const filtHorario = document.getElementById('relHorario')?.value || '';
     const filtStudio  = document.getElementById('relStudio')?.value  || '';
 
-    // Rebuild aluna select
     const sel = document.getElementById('relAluna');
     const cur = sel.value;
     sel.innerHTML = '<option value="">Todas</option>' + db.alunas.map(a=>`<option value="${a.id}"${a.id===cur?' selected':''}>${a.nome}</option>`).join('');
 
-    // Rebuild horário select
     const horSel = document.getElementById('relHorario');
     const curHor = horSel.value;
     const uniqueSlots = [...new Map(db.grade.map(s=>[s.hora+(s.studioId?'|'+s.studioId:''),s])).values()]
@@ -1307,7 +1317,6 @@
         return `<option value="${s.id}"${s.id===curHor?' selected':''}>${s.hora}${stNm}</option>`;
       }).join('');
 
-    // Rebuild studio select
     const studioSel = document.getElementById('relStudio');
     const curStudio = studioSel.value;
     studioSel.innerHTML = '<option value="">Todos os Estúdios</option>' +
@@ -1321,10 +1330,18 @@
       const slot = db.grade.find(s=>s.id===filtHorario);
       if (slot) auls = auls.filter(a=>a.source==='presenca' && a.slotId===filtHorario);
     }
+    
+    // Regra de Resgate
     if (filtStudio) {
       const slotIds = db.grade.filter(s=>s.studioId===filtStudio).map(s=>s.id);
-      auls = auls.filter(a=>a.source==='presenca' ? slotIds.includes(a.slotId) : false);
+      auls = auls.filter(a => {
+        const bySlot = a.source === 'presenca' && slotIds.includes(a.slotId);
+        const aluna = db.alunas.find(x => x.id === a.alunaId);
+        const byAluna = aluna && aluna.studioId === filtStudio;
+        return bySlot || byAluna;
+      });
     }
+
     auls.sort((a,b)=>b.data.localeCompare(a.data)||a.alunaId.localeCompare(b.alunaId));
 
     const byDate={};
@@ -1345,9 +1362,10 @@
           const badge= conv==='totalpass'?'<span class="plan-badge plan-totalpass">TotalPass</span>'
                      : conv==='wellhub'  ?'<span class="plan-badge plan-wellhub">Wellhub</span>':'';
           const slot = a.slotId ? db.grade.find(s=>s.id===a.slotId) : null;
-          const st   = slot?.studioId ? studioById(slot.studioId) : null;
-          const stLine = st ? `<div style="font-size:.75rem;font-weight:700;color:${st.cor};margin-top:3px">🏢 ${st.nome} · ⏰ ${slot.hora}</div>`
-                           : slot?.hora ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">⏰ ${slot.hora}</div>` : '';
+          // Mostra o estúdio mapeado via grade ou via aluna
+          const stObj = slot?.studioId ? studioById(slot.studioId) : (al?.studioId ? studioById(al.studioId) : null);
+          const stLine = stObj ? `<div style="font-size:.75rem;font-weight:700;color:${stObj.cor};margin-top:3px">🏢 ${stObj.nome} ${slot?.hora ? '· ⏰ '+slot.hora : ''}</div>`
+                               : slot?.hora ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">⏰ ${slot.hora}</div>` : '';
           return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:700;font-size:.95rem">👩 ${al?al.nome:'—'}${badge}</span>
@@ -1393,7 +1411,6 @@
         if(imp.presencas) db.presencas = imp.presencas;
         if(imp.studios)   db.studios   = imp.studios;
         if(imp.config)    db.config    = imp.config;
-        // run migrations again
         if(!db.grade)    db.grade=[];
         if(!db.presencas)db.presencas=[];
         if(!db.studios)  db.studios=[];
@@ -1425,10 +1442,18 @@
     let auls = allP.filter(a=>a.data>=de&&a.data<=ate);
     if (filtAluna)  auls = auls.filter(a=>a.alunaId===filtAluna);
     if (filtPlano)  auls = auls.filter(a=>{ const al=db.alunas.find(x=>x.id===a.alunaId); return (al?.convenio||'regular')===filtPlano; });
+    
+    // Regra de Resgate no PDF
     if (filtStudio) {
-      const slotIds=db.grade.filter(s=>s.studioId===filtStudio).map(s=>s.id);
-      auls=auls.filter(a=>a.source==='presenca'?slotIds.includes(a.slotId):false);
+      const slotIds = db.grade.filter(s=>s.studioId===filtStudio).map(s=>s.id);
+      auls = auls.filter(a => {
+        const bySlot = a.source === 'presenca' && slotIds.includes(a.slotId);
+        const aluna = db.alunas.find(x => x.id === a.alunaId);
+        const byAluna = aluna && aluna.studioId === filtStudio;
+        return bySlot || byAluna;
+      });
     }
+    
     auls.sort((a,b)=>b.data.localeCompare(a.data));
 
     const byDate={};
@@ -1452,7 +1477,10 @@
         const conv = al?.convenio||'regular';
         const convLabel = conv==='totalpass'?'TotalPass':conv==='wellhub'?'Wellhub':'—';
         const slot = a.slotId ? db.grade.find(s=>s.id===a.slotId) : null;
-        const stNm = slot?.studioId ? studioName(slot.studioId) : '';
+        
+        const stId = slot?.studioId || al?.studioId;
+        const stNm = stId ? studioName(stId) : '';
+        
         return `<tr>
           <td></td><td>${al?al.nome:'—'}</td><td>${a.tipo}</td>
           <td>${stNm}</td>
@@ -1505,7 +1533,7 @@
       <thead><tr><th style="width:100px">Data</th><th>Paciente</th><th style="width:90px">Tipo</th><th style="width:110px">Estúdio</th><th>Aparelhos / Convênio</th></tr></thead>
       <tbody>${linhas||'<tr><td colspan="5" style="text-align:center;padding:24px;color:#aaa">Nenhuma aula no período</td></tr>'}</tbody>
     </table>
-    <div class="footer">Pilates Control v3.0 · Relatório gerado automaticamente</div>
+    <div class="footer">Pilates Control v3.1 · Relatório gerado automaticamente</div>
     <script>window.onload=()=>{window.print();}<\/script>
     </body></html>`;
 
@@ -1589,7 +1617,7 @@
       <thead><tr><th>Horário</th>${headerCells}</tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="footer">Pilates Control v3.0 · Grade gerada automaticamente</div>
+    <div class="footer">Pilates Control v3.1 · Grade gerada automaticamente</div>
     <script>window.onload=()=>{window.print();}<\/script>
     </body></html>`;
 
@@ -1599,7 +1627,6 @@
     toast('🗓️ Abrindo grade para impressão...');
   }
 
-  // ─── HELPERS ──────────────────────────────────────────────────────────────
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
   document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
   function toast(msg) {
